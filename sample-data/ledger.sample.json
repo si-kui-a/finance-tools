@@ -1,0 +1,6 @@
+{
+  "schemaVersion": 1,
+  "entries": [
+    { "id": "e0001", "date": "2026-07-01", "type": "expense", "category": "餐飲", "account": null, "amountCents": -12000, "essential": true, "reimbursable": false, "status": "realized", "note": "示範資料" }
+  ]
+}

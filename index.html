@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>財務工具｜帳本 ＋ 成本試算</title>
+<link rel="stylesheet" href="shared/style.css">
+</head>
+<body>
+
+<header class="masthead">
+  <h1>財務工具</h1>
+  <p>純本機運算・資料不外傳・匯入匯出以 JSON 檔案為準</p>
+</header>
+
+<nav class="tabs">
+  <button class="tab-btn active" data-tab="ledger">帳本</button>
+  <button class="tab-btn" data-tab="estimator">成本試算</button>
+  <button class="tab-btn" data-tab="wage">工時反推</button>
+</nav>
+
+<main>
+  <section id="panel-ledger" class="tab-panel active">
+    <div class="card" id="personal-settings"></div>
+
+    <div class="card">
+      <h3>新增紀錄</h3>
+      <div id="ledger-form"></div>
+    </div>
+
+    <div class="card">
+      <h3>明細</h3>
+      <table>
+        <thead>
+          <tr><th>日期</th><th>類型</th><th>分類/帳戶</th><th>金額</th><th>必要性</th><th>可報銷</th><th>備註</th><th></th></tr>
+        </thead>
+        <tbody id="ledger-table-body"></tbody>
+      </table>
+    </div>
+
+    <div class="card" id="ledger-summary"></div>
+  </section>
+
+  <section id="panel-estimator" class="tab-panel">
+    <div class="card">
+      <div class="toolbar">
+        <label>選擇情境：<select id="scenario-select"></select></label>
+        <label><input type="checkbox" id="compare-toggle"> 比較「買房」與「買地自建」</label>
+      </div>
+      <div id="estimator-body"></div>
+    </div>
+  </section>
+
+  <section id="panel-wage" class="tab-panel">
+    <div class="card">
+      <h3>目標收入反推工時</h3>
+      <div id="wage-body"></div>
+    </div>
+  </section>
+</main>
+
+<footer class="io-bar">
+  <span>匯出：</span>
+  <button class="btn small" id="export-ledger">帳本 JSON</button>
+  <button class="btn small" id="export-config">設定 JSON</button>
+  <button class="btn small" id="export-scenarios">試算情境 JSON</button>
+  <button class="btn small" id="export-wage">工時反推 JSON</button>
+  <span>匯入：</span>
+  <input type="file" id="import-file" accept="application/json">
+</footer>
+
+<script src="shared/config.js"></script>
+<script src="shared/money.js"></script>
+<script src="shared/io.js"></script>
+<script src="shared/app.js"></script>
+</body>
+</html>

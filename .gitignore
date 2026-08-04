@@ -1,0 +1,7 @@
+# 真實財務資料匯出檔——防止誤入公開倉庫(見 hooks/check-no-real-data.sh 同一防護目的)
+ledger.json
+config.json
+estimator_*.json
+wage_reverse_*.json
+loan_*.json
+!sample-data/
