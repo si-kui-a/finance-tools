@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "scenarios": [
+    {
+      "schemaVersion": 1,
+      "scenarioId": "buy_house",
+      "label": "買房成本試算（範例）",
+      "applyInflation": true,
+      "inflationKey": "TW",
+      "items": [
+        { "label": "房價", "amountCents": 1000000000 },
+        { "label": "仲介費", "amountCents": 20000000 }
+      ],
+      "loanAmountCents": 700000000
+    }
+  ]
+}

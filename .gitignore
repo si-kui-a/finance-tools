@@ -1,7 +1,7 @@
 # 真實財務資料匯出檔——防止誤入公開倉庫(見 hooks/check-no-real-data.sh 同一防護目的)
-ledger.json
-config.json
-estimator_*.json
-wage_reverse_*.json
-loan_*.json
-!sample-data/
+# 用 /開頭錨定在repo根目錄，不會誤擋 sample-data/ 底下的 .sample.json 範例檔
+/ledger.json
+/config.json
+/estimator_*.json
+/wage_reverse_*.json
+/loan_*.json
