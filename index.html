@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>財務工具｜帳本 ＋ 成本試算</title>
+<title>財務工具｜帳本・成本試算</title>
 <link rel="stylesheet" href="shared/style.css">
 </head>
 <body>
@@ -14,13 +14,35 @@
 </header>
 
 <nav class="tabs">
-  <button class="tab-btn active" data-tab="ledger">帳本</button>
+  <button class="tab-btn active" data-tab="health">首頁</button>
+  <button class="tab-btn" data-tab="ledger">帳本</button>
   <button class="tab-btn" data-tab="estimator">成本試算</button>
   <button class="tab-btn" data-tab="wage">工時反推</button>
 </nav>
 
 <main>
-  <section id="panel-ledger" class="tab-panel active">
+  <section id="panel-health" class="tab-panel active">
+    <div class="card dashboard-card">
+      <h2>本月資金分配</h2>
+      <p class="notice">自動沿用固定出入帳、帳戶餘額與成本試算；只需選擇要納入的目標及搭配帳戶。</p>
+      <div id="allocation-dashboard"></div>
+    </div>
+    <div class="card">
+      <details>
+      <summary>進階財務健檢與假設</summary>
+      <p class="notice">全部以今日幣值規劃；不必先匯入帳本。結果是情境估算，不構成投資建議。</p>
+      <div id="health-form"></div>
+      </details>
+    </div>
+    <div class="card">
+      <details>
+        <summary>查看詳細健檢結果與壓力情境</summary>
+        <div id="health-results"></div>
+      </details>
+    </div>
+  </section>
+
+  <section id="panel-ledger" class="tab-panel">
     <div class="card" id="personal-settings"></div>
 
     <div class="card">
@@ -65,11 +87,26 @@
   <button class="btn small" id="export-config">設定 JSON</button>
   <button class="btn small" id="export-scenarios">試算情境 JSON</button>
   <button class="btn small" id="export-wage">工時反推 JSON</button>
+  <button class="btn small" id="export-workspace">完整工作區 JSON</button>
+  <button class="btn small" id="restore-workspace">回復上一版本</button>
   <span>匯入：</span>
   <input type="file" id="import-file" accept="application/json">
+  <div class="storage-status" id="storage-status">
+    <strong>本機保存位置</strong>
+    <span id="storage-status-text">正在檢查本機儲存空間…</span>
+    <small>工作資料會保存於目前 Edge 設定檔的本機站點資料；匯入的原始檔案不會被搬移。JSON 匯出的實際資料夾由瀏覽器下載設定決定。</small>
+  </div>
 </footer>
 
+<div class="save-indicator" id="save-indicator" role="status" aria-live="polite">
+  <span class="save-dot" aria-hidden="true"></span>
+  <span id="save-indicator-text">尚未保存</span>
+</div>
+
+<script src="shared/reference-data.js"></script>
 <script src="shared/config.js"></script>
+<script src="shared/validation.js"></script>
+<script src="shared/planning.js"></script>
 <script src="shared/money.js"></script>
 <script src="shared/io.js"></script>
 <script src="shared/app.js"></script>

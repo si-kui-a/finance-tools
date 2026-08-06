@@ -3,9 +3,161 @@
 
 const IO = (() => {
   let dirty = false;
+  let stateProvider = null;
+  let statusListener = null;
+  let historyTimer = null;
+  let fileSaveTimer = null;
+  let boundFileHandle = null;
+  const WORKSPACE_KEY = 'finance-tools.workspace.v1';
+  const DB_NAME = 'finance-tools-local';
+  const HISTORY_LIMIT = 20;
+  let lastSavedAt = null;
 
-  const markDirty = () => { dirty = true; };
+  const notifyStatus = (message, ok = true) => {
+    if (statusListener) statusListener({ message, ok, lastSavedAt, bindingName: boundFileHandle?.name || null });
+  };
+  const currentEnvelope = () => ({ schemaVersion: 1, savedAt: new Date().toISOString(), ...(stateProvider ? stateProvider() : {}) });
+  const saveCurrent = () => {
+    if (!stateProvider) return false;
+    try {
+      const envelope = currentEnvelope();
+      localStorage.setItem(WORKSPACE_KEY, JSON.stringify(envelope));
+      lastSavedAt = envelope.savedAt;
+      dirty = false;
+      notifyStatus(`已自動保存・${new Date(lastSavedAt).toLocaleString('zh-Hant-TW')}`);
+      return envelope;
+    } catch (err) {
+      dirty = true;
+      notifyStatus(`自動保存失敗：${err.message}`, false);
+      return false;
+    }
+  };
+  const openHistoryDb = () => new Promise((resolve, reject) => {
+    if (!globalThis.indexedDB) { reject(new Error('此瀏覽器不支援 IndexedDB')); return; }
+    const req = indexedDB.open(DB_NAME, 2);
+    req.onupgradeneeded = () => {
+      if (!req.result.objectStoreNames.contains('history')) req.result.createObjectStore('history', { keyPath: 'id', autoIncrement: true });
+      if (!req.result.objectStoreNames.contains('settings')) req.result.createObjectStore('settings');
+    };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+  const saveHistory = async () => {
+    if (!stateProvider) return;
+    try {
+      const db = await openHistoryDb();
+      const tx = db.transaction('history', 'readwrite');
+      const store = tx.objectStore('history');
+      store.add(currentEnvelope());
+      const countReq = store.count();
+      countReq.onsuccess = () => {
+        let remove = Math.max(0, countReq.result - HISTORY_LIMIT);
+        if (!remove) return;
+        const cursorReq = store.openCursor();
+        cursorReq.onsuccess = () => { const cursor = cursorReq.result; if (cursor && remove-- > 0) { cursor.delete(); cursor.continue(); } };
+      };
+      tx.oncomplete = () => db.close();
+    } catch (err) { notifyStatus(`目前資料已保存，但滾動版本建立失敗：${err.message}`, false); }
+  };
+  const saveBindingHandle = async (handle) => {
+    const db = await openHistoryDb();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction('settings', 'readwrite');
+      const store = tx.objectStore('settings');
+      handle ? store.put(handle, 'boundWorkspaceFile') : store.delete('boundWorkspaceFile');
+      tx.oncomplete = () => { db.close(); resolve(); };
+      tx.onerror = () => { db.close(); reject(tx.error); };
+    });
+  };
+  const initializeFileBinding = async () => {
+    try {
+      const db = await openHistoryDb();
+      boundFileHandle = await new Promise((resolve, reject) => {
+        const tx = db.transaction('settings', 'readonly');
+        const req = tx.objectStore('settings').get('boundWorkspaceFile');
+        req.onsuccess = () => resolve(req.result || null);
+        req.onerror = () => reject(req.error);
+        tx.oncomplete = () => db.close();
+      });
+      return boundFileHandle;
+    } catch { boundFileHandle = null; return null; }
+  };
+  const saveBoundFile = async ({ requestPermission = false } = {}) => {
+    if (!boundFileHandle || !stateProvider) return false;
+    try {
+      let permission = await boundFileHandle.queryPermission({ mode: 'readwrite' });
+      if (permission !== 'granted' && requestPermission) permission = await boundFileHandle.requestPermission({ mode: 'readwrite' });
+      if (permission !== 'granted') throw new Error('需要重新授權綁定檔案');
+      const envelope = currentEnvelope();
+      const writable = await boundFileHandle.createWritable();
+      await writable.write(JSON.stringify(envelope, null, 2));
+      await writable.close();
+      lastSavedAt = envelope.savedAt;
+      notifyStatus(`本機與 ${boundFileHandle.name} 已同步`);
+      return true;
+    } catch (err) {
+      notifyStatus(`瀏覽器資料已保存；綁定檔案未更新：${err.message}`, false);
+      return false;
+    }
+  };
+  const scheduleBoundFileSave = () => {
+    clearTimeout(fileSaveTimer);
+    if (boundFileHandle) fileSaveTimer = setTimeout(() => saveBoundFile(), 1000);
+  };
+  const bindWorkspaceFile = async () => {
+    if (!globalThis.showSaveFilePicker) throw new Error('此瀏覽器不支援工作區檔案綁定，請使用最新版 Edge 或 Chrome');
+    const handle = await showSaveFilePicker({ suggestedName: 'Finance-Workspace.json', types: [{ description: '理財工作區 JSON', accept: { 'application/json': ['.json'] } }] });
+    boundFileHandle = handle;
+    await saveBindingHandle(handle);
+    await saveBoundFile({ requestPermission: true });
+    return handle.name;
+  };
+  const unbindWorkspaceFile = async () => {
+    boundFileHandle = null;
+    clearTimeout(fileSaveTimer);
+    await saveBindingHandle(null);
+    notifyStatus('已解除檔案綁定；仍會自動保存於 Edge 本機資料');
+  };
+  const getBindingInfo = () => ({ supported: !!globalThis.showSaveFilePicker, name: boundFileHandle?.name || null, lastSavedAt });
+  const markDirty = () => {
+    dirty = true;
+    saveCurrent();
+    clearTimeout(historyTimer);
+    historyTimer = setTimeout(saveHistory, 800);
+    scheduleBoundFileSave();
+  };
   const clearDirty = () => { dirty = false; };
+  const configurePersistence = (provider, listener) => { stateProvider = provider; statusListener = listener || null; };
+  const loadWorkspace = () => {
+    try {
+      const raw = localStorage.getItem(WORKSPACE_KEY);
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+      lastSavedAt = parsed.savedAt || null;
+      return parsed;
+    } catch (err) { notifyStatus(`讀取本機工作區失敗：${err.message}`, false); return null; }
+  };
+  const requestPersistentStorage = async () => {
+    try {
+      if (!navigator.storage?.persist) return false;
+      const granted = await navigator.storage.persist();
+      notifyStatus(granted ? '瀏覽器已允許持久保存' : '瀏覽器未授予防清除保護；請定期匯出備份', granted);
+      return granted;
+    } catch { return false; }
+  };
+  const loadPreviousWorkspace = async () => {
+    const db = await openHistoryDb();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction('history', 'readonly');
+      const req = tx.objectStore('history').getAll();
+      req.onsuccess = () => {
+        const rows = req.result || [];
+        resolve(rows.length >= 2 ? rows[rows.length - 2] : (rows[0] || null));
+      };
+      req.onerror = () => reject(req.error);
+      tx.oncomplete = () => db.close();
+    });
+  };
 
   window.addEventListener('beforeunload', (e) => {
     if (!dirty) return;
@@ -55,5 +207,5 @@ const IO = (() => {
       reader.readAsText(file);
     });
 
-  return { markDirty, clearDirty, exportJson, importJsonFile };
+  return { markDirty, clearDirty, configurePersistence, loadWorkspace, loadPreviousWorkspace, saveCurrent, requestPersistentStorage, initializeFileBinding, bindWorkspaceFile, unbindWorkspaceFile, saveBoundFile, getBindingInfo, exportJson, importJsonFile };
 })();

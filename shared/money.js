@@ -21,8 +21,9 @@ const Money = (() => {
 
   // 換算成台幣分：非台幣一律用該筆紀錄自己帶的 rateToTWD 換算，缺少匯率就丟出明確錯誤，不靜默出 NaN
   const toTWDCents = (amountCents, currency, rateToTWD) => {
+    if (!Number.isFinite(amountCents)) throw new Error('金額必須是有限數字');
     if (!currency || currency === 'TWD') return amountCents;
-    if (rateToTWD === undefined || rateToTWD === null || Number.isNaN(rateToTWD)) {
+    if (!Number.isFinite(rateToTWD) || rateToTWD <= 0) {
       throw new Error(`幣別 ${currency} 缺少匯率，請先輸入這筆的「當下匯率」`);
     }
     return Math.round(amountCents * rateToTWD);
@@ -45,6 +46,22 @@ const Money = (() => {
     }
     return out;
   };
+  const calcExpenseAverages = (entries) => {
+    const expenses = (entries || []).filter(e => e.type === 'expense' && /^\d{4}-\d{2}/.test(e.date || ''));
+    if (!expenses.length) return { monthCount: 0, totalCents: 0, rows: [] };
+    const months = expenses.map(e => e.date.slice(0, 7)).sort();
+    const [sy, sm] = months[0].split('-').map(Number), [ey, em] = months.at(-1).split('-').map(Number);
+    const monthCount = (ey - sy) * 12 + em - sm + 1;
+    const totals = {};
+    for (const e of expenses) {
+      const amount = Math.abs(toTWDCents(e.amountCents, e.currency, e.rateToTWD));
+      const key = e.category || '未分類';
+      totals[key] = (totals[key] || 0) + amount;
+    }
+    const totalCents = Object.values(totals).reduce((s, v) => s + v, 0);
+    const rows = Object.entries(totals).map(([label, total]) => ({ label, totalCents: total, monthlyAverageCents: Math.round(total / monthCount), share: totalCents > 0 ? total / totalCents : 0 })).sort((a, b) => b.totalCents - a.totalCents);
+    return { monthCount, totalCents, rows };
+  };
 
   const sumItems = (items) => items.reduce((s, i) => s + i.amountCents, 0);
 
@@ -64,6 +81,43 @@ const Money = (() => {
     const laborFee = Math.round(insuredSalaryCents * rates.laborInsuranceRate * rates.laborInsurancePersonalShare);
     const healthFee = Math.round(insuredSalaryCents * rates.healthInsuranceRate * rates.healthInsurancePersonalShare);
     return { laborFee, healthFee, gross: targetNetCents + laborFee + healthFee };
+  };
+  const calcPayroll = (grossMonthlyCents, monthlyWorkHours, insuredSalaryCents, rates) => {
+    if (!Number.isFinite(grossMonthlyCents) || grossMonthlyCents <= 0) throw new RangeError('月總工資必須大於 0');
+    if (!Number.isFinite(monthlyWorkHours) || monthlyWorkHours <= 0) throw new RangeError('月工時必須大於 0');
+    const insured = Number.isFinite(insuredSalaryCents) && insuredSalaryCents >= 0 ? insuredSalaryCents : grossMonthlyCents;
+    const payroll = grossToNet(grossMonthlyCents, insured, rates);
+    return { ...payroll, gross: grossMonthlyCents, insuredSalaryCents: insured, hourlyRateCents: Math.round(grossMonthlyCents / monthlyWorkHours) };
+  };
+  const calcRecurringMonthly = (flows, rates) => {
+    const items = (Array.isArray(flows) ? flows : []).filter(f => f.active !== false).map((f) => {
+      const amount = Math.abs(Number(f.amountCents) || 0);
+      if (f.type === 'income') {
+        const hours = Number(f.monthlyWorkHours) > 0 ? Number(f.monthlyWorkHours) : 160;
+        const insured = f.insuredSalaryFollowsGross !== false ? amount : (Number(f.insuredSalaryCents) || amount);
+        const payroll = f.applyInsurance && amount > 0 ? calcPayroll(amount, hours, insured, rates) : { gross: amount, net: amount, laborFee: 0, healthFee: 0, hourlyRateCents: Math.round(amount / hours), insuredSalaryCents: insured };
+        return { ...f, grossCents: amount, netCents: payroll.net, payroll };
+      }
+      if (f.type === 'saving') return { ...f, grossCents: amount, netCents: 0, payroll: null };
+      return { ...f, grossCents: amount, netCents: -amount, payroll: null };
+    });
+    const incomeCents = items.filter(f => f.type === 'income').reduce((s, f) => s + f.netCents, 0);
+    const essentialExpenseCents = items.filter(f => f.type === 'expense' && f.essential !== false).reduce((s, f) => s + f.grossCents, 0);
+    const otherExpenseCents = items.filter(f => f.type === 'expense' && f.essential === false).reduce((s, f) => s + f.grossCents, 0);
+    const fixedSavingCents = items.filter(f => f.type === 'saving').reduce((s, f) => s + f.grossCents, 0);
+    return { items, incomeCents, essentialExpenseCents, otherExpenseCents, fixedSavingCents, monthlySavingsCents: incomeCents - essentialExpenseCents - otherExpenseCents };
+  };
+  const wageSettingsFromIncome = (flow) => {
+    if (!flow || flow.type !== 'income') throw new TypeError('必須選擇有效的固定收入來源');
+    const monthlyWorkHours = Number(flow.monthlyWorkHours) > 0 ? Number(flow.monthlyWorkHours) : 160;
+    const grossMonthlySalaryCents = Math.abs(Number(flow.amountCents) || 0);
+    const insuredSalaryFollowsGross = flow.insuredSalaryFollowsGross !== false;
+    return {
+      grossMonthlySalaryCents, monthlyWorkHours, applyInsurance: !!flow.applyInsurance,
+      insuredSalaryFollowsGross,
+      insuredSalaryCents: insuredSalaryFollowsGross ? grossMonthlySalaryCents : (Number(flow.insuredSalaryCents) || grossMonthlySalaryCents),
+      baseRateCentsPerHour: Math.round(grossMonthlySalaryCents / monthlyWorkHours)
+    };
   };
 
 
@@ -114,10 +168,14 @@ const Money = (() => {
   // v8 更新：salaryType 切換稅前/稅後（透過勞健保函式換算一致）；retireAgeSolveMode 可切換成
   // 「已知薪資成長率，反推幾歲能退休」（同一組公式，解不同的未知數）
   const calcFireScenario = (scenario, config) => {
+    const validation = Validation.validateScenario(scenario);
+    if (!validation.valid) throw new RangeError(validation.errors.map(e => e.message).join('；'));
     const workingYearsLeft = scenario.retireAge - scenario.startAge;
     const retirementYears = scenario.deathAge - scenario.retireAge;
     const annualRetirementExpense = scenario.retirementMonthlyExpenseCents * 12;
-    const retirementAssetTarget = Math.round(annualRetirementExpense / scenario.postRetirementAnnualReturnRate);
+    const retirementAssetTarget = scenario.postRetirementAnnualReturnRate === 0
+      ? annualRetirementExpense * retirementYears
+      : Math.round(annualRetirementExpense / scenario.postRetirementAnnualReturnRate);
     const emergencyFundTotal = scenario.currentMonthlyExpenseCents * scenario.emergencyFundMonths;
     const totalNeededBeforeRetire = retirementAssetTarget + scenario.buyHouseGoalCents
       + scenario.studyAbroadFundCents + emergencyFundTotal;
@@ -169,7 +227,7 @@ const Money = (() => {
         ? `理論所需年成長率 ≈ ${(impliedCAGR * 100).toFixed(2)}%（供對照，實際採用你設定的 ${(scenario.assumedSalaryGrowthRate * 100).toFixed(0)}%）\n`
         : `理論所需年成長率：無法計算（目前月薪換算成稅後淨薪後為負數，代表你填的「投保薪資」比實際月薪高很多，請檢查這兩個欄位是否合理）\n`) +
       `月薪分配基準 = 稅後實拿淨薪 = ${formatTWD(allocationBaseNet)}（分配是以「實際到手的錢」計算，不是稅前月薪，因為勞健保先扣才發薪，稅前金額你根本拿不到）` +
-      (Math.abs(allocationSumPct - 1) > 0.001 ? `\n⚠ 目前分配比例加總為 ${(allocationSumPct * 100).toFixed(1)}%，不等於 100%，請調整` : '');
+      (Math.abs(allocationSumPct - 1) > 0.001 ? `\n目前分配比例加總為 ${(allocationSumPct * 100).toFixed(1)}%，不等於 100%，請調整` : '');
 
     return {
       workingYearsLeft, retirementYears, retirementAssetTarget, emergencyFundTotal,
@@ -180,19 +238,29 @@ const Money = (() => {
     };
   };
 
-  // 反推「幾歲能退休」：同一組正推公式，改用逐年疊代搜尋解「退休年齡」這個未知數。
-  // 簡化假設：以目前薪水按 assumedSalaryGrowthRate 逐年成長，並假設固定比例（用 FIRE 分配裡的
-  // 「投資提撥」比例）存下來，累積到能覆蓋當年度的退休資產目標時，即為可退休年齡。
+  // 反推「幾歲能退休」：以月度現金流累積，薪資先轉為淨薪、扣除生活費後投入，
+  // 並要求資產同時覆蓋退休資產、買房、留學與緊急預備金，避免和主試算口徑不一致。
   const solveFireRetireAge = (scenario, config) => {
-    const investPct = scenario.allocationPercents['投資提撥（FIRE 基金）'] || 0.2;
     let accumulated = scenario.totalSavedCents;
-    let salary = scenario.currentMonthlySalaryCents;
-    for (let age = scenario.startAge + 1; age <= 70; age++) {
-      salary = Math.round(salary * (1 + scenario.assumedSalaryGrowthRate));
-      accumulated += Math.round(salary * investPct * 12);
-      const target = calcFireScenario({ ...scenario, retireAge: age, retireAgeSolveMode: 'given_age' }, config)
-        .retirementAssetTarget;
-      if (accumulated >= target) return age;
+    let grossOrNetSalary = scenario.currentMonthlySalaryCents;
+    const monthlySalaryGrowth = Math.pow(1 + scenario.assumedSalaryGrowthRate, 1 / 12) - 1;
+    const monthlyInvestmentReturn = Math.pow(1 + (scenario.preRetirementAnnualReturnRate || 0), 1 / 12) - 1;
+    for (let month = 1; month <= (70 - scenario.startAge) * 12; month++) {
+      grossOrNetSalary *= (1 + monthlySalaryGrowth);
+      const salaryNet = scenario.salaryType === 'gross'
+        ? grossToNet(Math.round(grossOrNetSalary), scenario.insuredSalaryCents, config.insuranceRates).net
+        : Math.round(grossOrNetSalary);
+      const surplus = Math.max(0, salaryNet - scenario.currentMonthlyExpenseCents);
+      accumulated = Math.round(accumulated * (1 + monthlyInvestmentReturn)) + surplus;
+      const age = scenario.startAge + month / 12;
+      const retireAge = Math.ceil(age);
+      const annualRetirementExpense = scenario.retirementMonthlyExpenseCents * 12;
+      const retirementTarget = scenario.postRetirementAnnualReturnRate === 0
+        ? annualRetirementExpense * Math.max(0, scenario.deathAge - retireAge)
+        : Math.round(annualRetirementExpense / scenario.postRetirementAnnualReturnRate);
+      const emergency = scenario.currentMonthlyExpenseCents * scenario.emergencyFundMonths;
+      const fullTarget = retirementTarget + scenario.buyHouseGoalCents + scenario.studyAbroadFundCents + emergency;
+      if (accumulated >= fullTarget) return Math.ceil(age * 10) / 10;
     }
     return null; // 70 歲前都達不到
   };
@@ -250,7 +318,7 @@ const Money = (() => {
     const twd = toTWDCents(amountCents, currency, rateToTWD);
     const wage = calcWageReverse({ ...wageScenario, targetAmountCents: twd, currency: 'TWD', rateToTWD: 1 }, config);
     const monthsViaSaving = config.personalBaseline.monthlySavingsCapacityCents > 0
-      ? Math.round(twd / config.personalBaseline.monthlySavingsCapacityCents)
+      ? Math.ceil(Math.max(0, twd) / config.personalBaseline.monthlySavingsCapacityCents)
       : null;
     const ageAtCompletion = monthsViaSaving !== null
       ? Math.round((config.personalBaseline.currentAge + monthsViaSaving / 12) * 10) / 10
@@ -304,7 +372,7 @@ const Money = (() => {
   };
 
   return {
-    toCents, toYuan, formatMoney, formatTWD, toTWDCents, groupSum, sumItems, applyInflation,
-    grossToNet, netToGross, calcWageReverse, calcAchievabilityHint, calcScenario, buildTrendChartSVG
+    toCents, toYuan, formatMoney, formatTWD, toTWDCents, groupSum, calcExpenseAverages, sumItems, applyInflation,
+    grossToNet, netToGross, calcPayroll, calcRecurringMonthly, wageSettingsFromIncome, calcWageReverse, calcAchievabilityHint, calcScenario, buildTrendChartSVG
   };
 })();

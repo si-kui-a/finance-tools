@@ -9,21 +9,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: 掃描疑似真實資料檔案
-        run: |
-          blocked=0
-          while IFS= read -r -d '' f; do
-            base=$(basename "$f")
-            if [[ "$base" =~ ^(ledger|config|estimator_.*|wage_reverse_.*|loan_.*)\.json$ ]] && [[ "$f" != sample-data/* ]] && [[ "$base" != *.sample.* ]]; then
-              echo "::error file=$f::偵測到疑似真實資料檔案，不應出現在公開倉庫"
-              blocked=1
-            fi
-            if grep -q '"amountCents"' "$f" 2>/dev/null && [[ "$f" != sample-data/* ]]; then
-              echo "::error file=$f::偵測到疑似真實財務資料內容（amountCents 欄位）"
-              blocked=1
-            fi
-          done < <(find . -name "*.json" -not -path "./.git/*" -print0)
+        run: bash scripts/check-no-real-data.sh
 
-          if [[ $blocked -eq 1 ]]; then
-            echo "偵測到疑似真實資料，工作流程失敗，請檢查後修正。"
-            exit 1
-          fi
+      - name: 執行計算與驗證測試
+        run: node --test

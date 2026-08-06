@@ -9,6 +9,19 @@ const DEFAULT_CONFIG = {
   inflationMultipliers: { TW: 1.58, JP: 1.3, EU: 1.291 },
   categories: ['食', '超商', '飲料', '手續費', '娛', '居家', '行', '學用', '3C'],
   accounts: ['華南', '遠東', '狗狗', '聯邦', '王道', '台新', '現金', '郵局', '元大', '玉山', '合作'],
+  accountProfiles: [
+    { id: 'cash', name: '現金', nature: 'cash', initialBalanceCents: 0 },
+    { id: 'bank', name: '主要銀行', nature: 'checking', initialBalanceCents: 0 }
+  ],
+  recurringCashFlows: [],
+  dashboard: {
+    livingAccountId: 'bank',
+    fixedExpenseAccountId: 'bank',
+    emergencyAccountId: 'bank',
+    scenarioSelections: {},
+    scenarioAccountMap: {},
+    scenarioTargetMonths: {}
+  },
   // [反推] 原表「目標上限」列
   budgetLimitsCents: {
     食: 200000, 超商: 10000, 飲料: 0, 手續費: 1500,
@@ -26,6 +39,17 @@ const DEFAULT_CONFIG = {
   personalBaseline: {
     currentAge: 22,
     monthlySavingsCapacityCents: 0
+  },
+  quickPlan: {
+    currentAge: 22,
+    monthlyNetIncomeCents: 3300000,
+    monthlyEssentialExpenseCents: 1800000,
+    monthlyOtherExpenseCents: 700000,
+    liquidAssetsCents: 5000000,
+    goalAmountTodayCents: 30000000,
+    goalTargetMonth: '2028-12',
+    inflationAnnualRate: REFERENCE_DATA.twInflation.annualRate,
+    nominalReturnAnnualRate: 0.05
   },
   lastUpdated: null
 };
@@ -212,6 +236,8 @@ const SCENARIO_FIRE = {
   // 你自己設定的「明年薪資成長假設」，用來反推「明年應有月薪目標」；
   // 旁邊會同時顯示「理論上需要的年成長率」供對照，兩者不一致很正常，代表現實與理想的落差
   assumedSalaryGrowthRate: 0.2,
+  // 退休前累積資產所用的名目年報酬假設；反推退休年齡會按月複利並納入生活費與全部目標。
+  preRetirementAnnualReturnRate: 0.05,
   // 目前月薪的分配比例（總和須為 1.0），用來看目前薪水打算怎麼分配運用
   allocationPercents: {
     '投資提撥（FIRE 基金）': 0.20,
@@ -241,6 +267,10 @@ const WAGE_REVERSE_SCENARIO = {
   currency: 'TWD',
   rateToTWD: 1,
   baseRateCentsPerHour: 21000,
+  grossMonthlySalaryCents: 3300000,
+  monthlyWorkHours: 160,
+  insuredSalaryFollowsGross: true,
+  linkedRecurringFlowId: 'auto',
   applyInsurance: false,
   insuredSalaryCents: 3300000,
   conversionChain: [
