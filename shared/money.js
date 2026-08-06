@@ -286,6 +286,43 @@ const Money = (() => {
     return { periods, grandTotal };
   };
 
+  const calcStudentLoanRepayment = (principalCents, borrowedSemesters, repayment, currentAge) => {
+    const principal = Math.max(0, Math.round(Number(principalCents) || 0));
+    const semesters = Math.max(1, Math.trunc(Number(borrowedSemesters) || 1));
+    const multiplier = repayment.termPlan === 'low_income' ? 2 : (repayment.termPlan === 'extended' ? 1.5 : 1);
+    const termMonths = Math.max(12, Math.round(semesters * 12 * multiplier));
+    const annualRate = Math.max(0, Number(repayment.annualRate) || 0);
+    const monthlyRate = annualRate / 12;
+    const monthlyPaymentCents = principal === 0 ? 0 : Math.ceil(monthlyRate === 0
+      ? principal / termMonths
+      : principal * monthlyRate / (1 - Math.pow(1 + monthlyRate, -termMonths)));
+    const totalRepaymentCents = monthlyPaymentCents * termMonths;
+    const repaymentStartAge = Number(repayment.graduationAge) + Number(repayment.graceYears);
+    const repaymentEndAge = repaymentStartAge + termMonths / 12;
+    const age = Number(currentAge);
+    const status = age < repaymentStartAge ? 'waiting' : (age >= repaymentEndAge ? 'completed' : 'repaying');
+    return { principalCents: principal, borrowedSemesters: semesters, termMonths, termYears: termMonths / 12, annualRate, monthlyPaymentCents, totalRepaymentCents, totalInterestCents: Math.max(0, totalRepaymentCents - principal), repaymentStartAge, repaymentEndAge, status };
+  };
+
+  const calcMortgageRepayment = (principalCents, mortgage, currentAge) => {
+    const principal = Math.max(0, Math.round(Number(principalCents) || 0));
+    const annualRate = Math.max(0, Number(mortgage.annualRate) || 0);
+    const monthlyRate = annualRate / 12;
+    const termMonths = Math.max(12, Math.round(Math.max(1, Number(mortgage.termYears) || 1) * 12));
+    const graceMonths = Math.min(termMonths - 1, Math.max(0, Math.round(Math.max(0, Number(mortgage.graceYears) || 0) * 12)));
+    const amortizingMonths = termMonths - graceMonths;
+    const interestOnlyPaymentCents = principal === 0 ? 0 : Math.ceil(principal * monthlyRate);
+    const monthlyPaymentCents = principal === 0 ? 0 : Math.ceil(monthlyRate === 0 ? principal / amortizingMonths : principal * monthlyRate / (1 - Math.pow(1 + monthlyRate, -amortizingMonths)));
+    const totalRepaymentCents = interestOnlyPaymentCents * graceMonths + monthlyPaymentCents * amortizingMonths;
+    const repaymentStartAge = Number(mortgage.purchaseAge);
+    const graceEndAge = repaymentStartAge + graceMonths / 12;
+    const repaymentEndAge = repaymentStartAge + termMonths / 12;
+    const age = Number(currentAge);
+    const status = age < repaymentStartAge ? 'waiting' : (age < graceEndAge ? 'grace' : (age < repaymentEndAge ? 'repaying' : 'completed'));
+    const currentPaymentCents = (status === 'grace' || (status === 'waiting' && graceMonths > 0)) ? interestOnlyPaymentCents : monthlyPaymentCents;
+    return { principalCents: principal, annualRate, termMonths, termYears: termMonths / 12, graceMonths, graceYears: graceMonths / 12, amortizingMonths, interestOnlyPaymentCents, monthlyPaymentCents, currentPaymentCents, totalRepaymentCents, totalInterestCents: Math.max(0, totalRepaymentCents - principal), repaymentStartAge, graceEndAge, repaymentEndAge, status };
+  };
+
   // 工時反推計算機：全站唯一實作，成本試算頁面的「自動提示」也是呼叫這個函式，不另外寫簡化公式。
   // 精度規則（已用「期望收益910,626」「學貸還款155,893」兩組真實數字重新驗證修正）：
   // 每一層要用「上一層無條件進位後的整數」往下除，是無條件進位（ceiling），不是四捨五入——
@@ -373,6 +410,6 @@ const Money = (() => {
 
   return {
     toCents, toYuan, formatMoney, formatTWD, toTWDCents, groupSum, calcExpenseAverages, sumItems, applyInflation,
-    grossToNet, netToGross, calcPayroll, calcRecurringMonthly, wageSettingsFromIncome, calcWageReverse, calcAchievabilityHint, calcScenario, buildTrendChartSVG
+    grossToNet, netToGross, calcPayroll, calcRecurringMonthly, wageSettingsFromIncome, calcWageReverse, calcAchievabilityHint, calcScenario, calcStudentLoanRepayment, calcMortgageRepayment, buildTrendChartSVG
   };
 })();

@@ -50,6 +50,7 @@ const Planning = (() => {
     const dailyLivingCents = Math.floor(Math.max(0, income - fixedExpense - recommendedSavingCents) / Math.max(1, daysInMonth || 30));
     let health = { level: 'unknown', label: '資料不足' };
     const issues = [];
+    const strengths = [];
     if (actualSavingsRate !== null) {
       if (actualSavingsRate < 0) health = { level: 'critical', label: '收支失衡' };
       else if (actualSavingsRate < 0.10) health = { level: 'risk', label: '偏低' };
@@ -63,7 +64,12 @@ const Planning = (() => {
     else if (actualSavingsRate !== null && actualSavingsRate < 0.20) issues.push('本月儲蓄率尚未達到 20% 規劃基準');
     if (dailyLivingCents <= 0 && income > 0) issues.push('扣除固定支出與應儲蓄後，已無每日生活費空間');
     if (attainmentRate !== null && attainmentRate < 1) issues.push('本月儲蓄尚未達成建議金額');
-    return { recommendedSavingCents, plannedSavingsRate, actualSavingsCents, actualSavingsRate, attainmentRate, dailyLivingCents, health, issues };
+    if (actualIncomeCents > 0 && actualSavingsCents >= 0) strengths.push('本月收入仍高於或等於支出，現金流維持非負');
+    if (actualSavingsRate !== null && actualSavingsRate >= 0.20) strengths.push(`本月儲蓄率 ${(actualSavingsRate * 100).toFixed(1)}%，已達 20% 規劃基準`);
+    if (attainmentRate !== null && attainmentRate >= 1) strengths.push('本月實際儲蓄已達成建議金額');
+    if (fixedSaving > 0) strengths.push('已建立固定儲蓄安排，降低遺漏儲蓄的機會');
+    if (dailyLivingCents > 0 && income > 0) strengths.push('依目前規劃，扣除固定支出與應儲蓄後仍保有生活費空間');
+    return { recommendedSavingCents, plannedSavingsRate, actualSavingsCents, actualSavingsRate, attainmentRate, dailyLivingCents, health, issues, strengths };
   };
 
   const assess = (p, now = new Date()) => {
@@ -75,7 +81,7 @@ const Planning = (() => {
     const emergencyMonths = p.monthlyEssentialExpenseCents > 0 ? p.liquidAssetsCents / p.monthlyEssentialExpenseCents : null;
     const emergencyTarget = p.monthlyEssentialExpenseCents * 6;
     const emergencyGap = Math.max(0, emergencyTarget - p.liquidAssetsCents);
-    // 緊急預備金不可同時充當目標本金；只有超過六個月必要支出的部分可投入第一目標。
+    // 緊急預備金不可同時充當目標本金；只有超過六個月必要支出的部分可投入主要目標。
     const goalStartingAssets = Math.max(0, p.liquidAssetsCents - emergencyTarget);
     const months = monthsBetween(now, p.goalTargetMonth);
     const futureGoal = futureValue(p.goalAmountTodayCents, p.inflationAnnualRate, months);

@@ -5,6 +5,7 @@
 
 const DEFAULT_CONFIG = {
   schemaVersion: 2,
+  ui: { viewMode: 'simple', activeTab: 'health', currentScenarioId: 'buy_house', expandedDetails: [] },
   // [反推] TW/JP/EU 通膨倍數：驗證方式為「總額 × 倍數 = 原表通膨後總額」，三個情境交叉核對皆吻合
   inflationMultipliers: { TW: 1.58, JP: 1.3, EU: 1.291 },
   categories: ['食', '超商', '飲料', '手續費', '娛', '居家', '行', '學用', '3C'],
@@ -20,7 +21,14 @@ const DEFAULT_CONFIG = {
     emergencyAccountId: 'bank',
     scenarioSelections: {},
     scenarioAccountMap: {},
-    scenarioTargetMonths: {}
+    scenarioTargetMonths: {},
+    summaryCards: [
+      { id: 'income', source: 'income', label: '月收入', visible: true, builtIn: true },
+      { id: 'fixed-expense', source: 'fixedExpense', label: '固定應繳', visible: true, builtIn: true },
+      { id: 'recommended-saving', source: 'recommendedSaving', label: '應儲蓄', visible: true, builtIn: true },
+      { id: 'daily-living', source: 'dailyLiving', label: '每日生活費', visible: true, builtIn: true },
+      { id: 'monthly-flex', source: 'monthlyFlex', label: '月度餘裕', visible: true, builtIn: true }
+    ]
   },
   // [反推] 原表「目標上限」列
   budgetLimitsCents: {
@@ -37,6 +45,7 @@ const DEFAULT_CONFIG = {
   },
   // 用於「存款版」工時反推提示（跟工時反推引擎的費率設定無關，只用來算存錢版的達成月數/年齡）
   personalBaseline: {
+    birthYear: 2004,
     currentAge: 22,
     monthlySavingsCapacityCents: 0
   },
@@ -46,8 +55,11 @@ const DEFAULT_CONFIG = {
     monthlyEssentialExpenseCents: 1800000,
     monthlyOtherExpenseCents: 700000,
     liquidAssetsCents: 5000000,
+    goalScenarioId: 'manual',
     goalAmountTodayCents: 30000000,
+    goalDeadlineMode: 'month',
     goalTargetMonth: '2028-12',
+    goalTargetAge: 30,
     inflationAnnualRate: REFERENCE_DATA.twInflation.annualRate,
     nominalReturnAnnualRate: 0.05
   },
@@ -84,7 +96,13 @@ const SCENARIO_BUY_HOUSE = {
   ],
   downPaymentCurrentCents: 8937400,
   downPaymentRequiredCents: 750000000,
-  loanAmountCents: 1050000000
+  loanAmountCents: 1050000000,
+  mortgage: {
+    purchaseAge: 30, annualRate: 0.0337, termYears: 30, graceYears: 0,
+    principalMode: 'estimated', manualPrincipalCents: 0,
+    includeAsFixedExpense: false, paymentDay: 5, accountId: '', reserveMonths: 6,
+    loanPosition: 'first_home'
+  }
 };
 
 // [反推] 買地自建費用情境，項目與買房情境不同，但共用同一套計算引擎
@@ -127,7 +145,7 @@ const SCENARIO_TRIP_BUDGET = {
   rateToTWD: 1,
   calcType: 'items',
   scenarioId: 'trip_budget',
-  label: '旅費預算試算（10天日本行程範例）',
+  label: '旅費預算試算',
   applyInflation: true,
   inflationKey: 'JP',
   items: [
@@ -166,7 +184,13 @@ const SCENARIO_STUDENT_LOAN = {
     { label: '大三下', overrides: {} },
     { label: '大四上', overrides: {} },
     { label: '大四下', overrides: {} }
-  ]
+  ],
+  repayment: {
+    graduationAge: 22, graceYears: 2, annualRate: 0.00775,
+    termPlan: 'standard', includeAsFixedExpense: false,
+    paymentDay: 5, accountId: '', principalMode: 'estimated',
+    manualPrincipalCents: 0, reserveMonths: 3
+  }
 };
 
 // [反推＋驗證] 喪葬費情境：項目加總與原表「預估喪葬所需總額」56,000 完全吻合

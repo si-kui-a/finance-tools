@@ -164,6 +164,9 @@ test('每月儲蓄健康度、每日生活費與達成率可自動計算', () =>
   assert.equal(result.attainmentRate, 1.25);
   assert.equal(result.health.label, '健康');
   assert.equal(result.dailyLivingCents, Math.floor(1700000 / 31));
+  assert.ok(result.strengths.some(text => text.includes('已達 20%')));
+  assert.ok(result.strengths.some(text => text.includes('已達成建議金額')));
+  assert.ok(result.strengths.some(text => text.includes('固定儲蓄')));
 });
 
 test('分類花費可計算跨月平均與占比，包含中間空白月份', () => {
@@ -177,6 +180,31 @@ test('分類花費可計算跨月平均與占比，包含中間空白月份', ()
   assert.equal(result.totalCents, 100000);
   assert.equal(result.rows.find(r => r.label === '食').monthlyAverageCents, 30000);
   assert.equal(result.rows.find(r => r.label === '食').share, 0.9);
+});
+
+test('學貸依現行年金法估算月繳、年限與年齡啟用狀態', () => {
+  const repayment = { graduationAge: 22, graceYears: 2, annualRate: 0.00775, termPlan: 'standard' };
+  const waiting = api.Money.calcStudentLoanRepayment(10000000, 8, repayment, 23);
+  assert.equal(waiting.termMonths, 96);
+  assert.equal(waiting.termYears, 8);
+  assert.equal(waiting.repaymentStartAge, 24);
+  assert.equal(waiting.status, 'waiting');
+  assert.ok(waiting.monthlyPaymentCents > Math.ceil(10000000 / 96));
+  assert.equal(api.Money.calcStudentLoanRepayment(10000000, 8, repayment, 25).status, 'repaying');
+  assert.equal(api.Money.calcStudentLoanRepayment(10000000, 8, { ...repayment, termPlan: 'low_income' }, 25).termYears, 16);
+});
+
+test('房貸可計算寬限期、正常月繳、總利息與升息壓力', () => {
+  const mortgage = { purchaseAge: 30, annualRate: 0.03, termYears: 30, graceYears: 2 };
+  const plan = api.Money.calcMortgageRepayment(1000000000, mortgage, 30);
+  assert.equal(plan.status, 'grace');
+  assert.equal(plan.graceMonths, 24);
+  assert.equal(plan.termMonths, 360);
+  assert.equal(plan.currentPaymentCents, plan.interestOnlyPaymentCents);
+  assert.ok(plan.monthlyPaymentCents > plan.interestOnlyPaymentCents);
+  assert.ok(plan.totalInterestCents > 0);
+  const stressed = api.Money.calcMortgageRepayment(1000000000, { ...mortgage, annualRate: 0.05 }, 32);
+  assert.ok(stressed.monthlyPaymentCents > plan.monthlyPaymentCents);
 });
 
 test('FIRE反推納入其他目標：提高買房目標不得提早退休', () => {

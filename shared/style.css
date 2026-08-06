@@ -18,6 +18,7 @@
 }
 
 * { box-sizing: border-box; }
+[hidden] { display: none !important; }
 html { max-width: 100%; overflow-x: hidden; }
 
 body {
@@ -34,6 +35,10 @@ header.masthead {
   max-width: 1280px;
   margin: 0 auto;
   padding: 32px 28px 18px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
 }
 header.masthead h1 {
   margin: 0;
@@ -45,6 +50,85 @@ header.masthead p {
   color: var(--ink-soft);
   font-size: 0.9rem;
 }
+.view-mode-control {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid var(--rule);
+  border-radius: 999px;
+  background: var(--paper-card);
+  white-space: nowrap;
+}
+.view-mode-control > span { padding: 0 8px; color: var(--ink-soft); font-size: 0.8rem; }
+.view-mode-btn {
+  min-height: 34px;
+  padding: 6px 12px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--ink-soft);
+  cursor: pointer;
+}
+.view-mode-btn:hover { color: var(--ink); background: var(--accent-soft); }
+.view-mode-btn.active { color: #fff; background: var(--accent); }
+.simple-mode-hint { display: none; }
+
+/* 結論模式是獨立的閱讀介面，不只是把 details 關起來。 */
+body[data-view-mode="simple"] .simple-mode-hint {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin: 14px 0 4px;
+  padding: 11px 14px;
+  border: 1px solid var(--rule);
+  border-radius: 12px;
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+  font-size: 0.86rem;
+}
+body[data-view-mode="simple"] .editor-only,
+body[data-view-mode="simple"] .edit-card,
+body[data-view-mode="simple"] .detail-card,
+body[data-view-mode="simple"] .detail-only,
+body[data-view-mode="simple"] .wage-detail-card { display: none !important; }
+body[data-view-mode="simple"] .card {
+  padding: 18px;
+  margin: 10px 0;
+  box-shadow: 0 5px 18px rgba(28, 67, 52, 0.05);
+}
+body[data-view-mode="simple"] .summary-block { margin-bottom: 0; }
+body[data-view-mode="simple"] .conclusion-card > h2 { margin: 0 0 10px; font-size: 1.15rem; }
+body[data-view-mode="simple"] #health-results > h3:not(:first-child) { margin: 18px 0 8px; font-size: 0.95rem; }
+body[data-view-mode="simple"] #allocation-dashboard > .compact-settings { display: none; }
+body[data-view-mode="simple"] .estimator-controls {
+  margin: 10px 0 14px;
+  padding: 10px 12px;
+  background: var(--accent-soft);
+}
+body[data-view-mode="simple"] #estimator-body .estimator-field-grid,
+body[data-view-mode="simple"] #estimator-body .estimator-option-grid,
+body[data-view-mode="simple"] #estimator-body .setup-steps,
+body[data-view-mode="simple"] #estimator-body .student-loan-toggle,
+body[data-view-mode="simple"] #estimator-body .student-loan-plan > .section-heading,
+body[data-view-mode="simple"] #estimator-body .student-loan-plan > details,
+body[data-view-mode="simple"] #estimator-body .student-loan-plan > .notice { display: none; }
+body[data-view-mode="simple"] #estimator-body .student-loan-plan {
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+body[data-view-mode="simple"] #estimator-body > .result-block,
+body[data-view-mode="simple"] #wage-body > .result-block {
+  border: 1px solid var(--rule);
+  border-radius: 12px;
+  padding: 16px;
+  background: linear-gradient(145deg, #F5FAF7, var(--accent-soft));
+}
+body[data-view-mode="simple"] #estimator-body .result-block details { display: none; }
+body[data-view-mode="simple"] .wage-source-card > :not(.health-grid) { display: none; }
+body[data-view-mode="simple"] #wage-body > .notice { display: none; }
 
 nav.tabs {
   display: flex;
@@ -137,7 +221,16 @@ th { color: var(--ink-soft); font-weight: 600; border-bottom: 1px solid var(--ru
 .summary-block.highlight { background: linear-gradient(145deg, #EDF6F1, #E3F0E9); padding: 16px; border-radius: 12px; }
 .health-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; }
 .dashboard-card h2 { margin: 0 0 6px; font-size: 1.25rem; }
+.dashboard-summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
 .dashboard-summary .summary-block { margin-bottom: 0; }
+.dashboard-mini-card { min-width: 0; padding: 13px 14px; border: 1px solid var(--rule); border-radius: 11px; background: linear-gradient(145deg, #F7FBF9, var(--accent-soft)); }
+.dashboard-mini-card h3 { margin: 0 0 7px; padding: 0 0 5px; font-size: 0.88rem; }
+.dashboard-mini-value { margin: 8px 0 5px; font-size: 1.12rem; font-weight: 700; overflow-wrap: anywhere; }
+.dashboard-mini-card .notice { margin: 0; font-size: 0.76rem; }
+.dashboard-mini-card.negative-card { border-color: #E8D7DA; background: #FCF6F7; }
+.dashboard-mini-card.missing-card { border-style: dashed; background: #FAFBFA; }
+.summary-card-setting-row { display: grid; grid-template-columns: auto minmax(140px, 1fr) minmax(170px, 1.2fr) auto; gap: 8px; align-items: center; margin: 8px 0; }
+.summary-card-setting-row input[type="text"], .summary-card-setting-row select { width: 100%; min-height: 36px; padding: 7px 9px; border: 1px solid var(--rule); border-radius: 9px; background: #fff; color: var(--ink); }
 .compact-settings { border-top: 1px solid var(--rule); padding: 10px 0; }
 .compact-settings summary { cursor: pointer; color: var(--accent); font-weight: 650; }
 .goal-picker { display: grid; grid-template-columns: minmax(220px, 1fr) minmax(130px, 180px) minmax(130px, 170px); gap: 10px; align-items: center; padding: 7px 0; border-bottom: 1px solid var(--rule); }
@@ -150,10 +243,50 @@ th { color: var(--ink-soft); font-weight: 600; border-bottom: 1px solid var(--ru
 .health-healthy, .health-strong { color: var(--accent); }
 .savings-issues { margin: 14px 0; padding: 12px 14px; border: 1px solid #E8D7DA; border-radius: 10px; background: #FCF6F7; color: var(--negative); font-size: 0.86rem; }
 .savings-issues ul { margin: 7px 0 0; padding-left: 20px; }
+.savings-strengths { margin: 14px 0; padding: 12px 14px; border: 1px solid #CBE3D6; border-radius: 10px; background: #F2FAF6; color: var(--accent-strong); font-size: 0.86rem; }
+.savings-strengths ul { margin: 7px 0 0; padding-left: 20px; }
 .summary-block h3 { margin: 0 0 8px; font-size: 1rem; border-bottom: 1px solid var(--rule); padding-bottom: 4px; }
 
 .result-block { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--rule); }
 .result-block p { margin: 6px 0; }
+
+/* 成本試算沿用全站設計系統，欄位、清單與結果只在此區調整版面。 */
+.estimator-shell { overflow: hidden; }
+.estimator-controls { display: flex; align-items: end; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin: 14px 0 20px; padding: 14px 16px; border: 1px solid var(--rule); border-radius: 12px; background: #FAFCFB; }
+.estimator-controls .field { margin: 0; }
+.scenario-actions { display: flex; gap: 8px; flex-wrap: wrap; margin: -8px 0 18px; }
+.control-check { display: inline-flex; align-items: center; gap: 7px; min-height: 38px; color: var(--ink-soft); font-size: 0.86rem; cursor: pointer; }
+.estimator-field-grid, .estimator-option-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; margin: 14px 0; }
+.estimator-field { display: flex; width: 100%; margin: 0; min-width: 0; }
+.estimator-field input, .estimator-field select { width: 100%; }
+.estimator-option-grid .estimator-field > span { color: var(--ink-soft); margin-bottom: 3px; }
+#estimator-body input:not([type="checkbox"]), #estimator-body select { min-height: 38px; padding: 8px 10px; border: 1px solid var(--rule); border-radius: 9px; background: #fff; font-family: var(--mono); color: var(--ink); }
+#estimator-body input:focus, #estimator-body select:focus { outline: 3px solid rgba(39, 107, 82, 0.13); border-color: var(--accent); }
+.estimator-items-table { min-width: 520px; }
+.estimator-items-table input { width: 100%; }
+.estimator-items-table td:nth-child(2) { width: 34%; }
+.estimator-items-table td:last-child { width: 1%; white-space: nowrap; }
+.estimator-section { margin: 12px 0; padding: 10px 14px; border: 1px solid var(--rule); border-radius: 12px; background: #FAFCFB; }
+#estimator-body > .result-block { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 8px 18px; margin-top: 18px; padding: 16px; border: 1px solid var(--rule); border-radius: 12px; background: linear-gradient(145deg, #F5FAF7, var(--accent-soft)); }
+#estimator-body > .result-block details { grid-column: 1 / -1; }
+.period-block h4 { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.period-block h4 > input { flex: 1 1 180px; }
+.student-loan-plan { margin-top: 18px; background: #F8FBF9; }
+.student-loan-plan a { color: var(--accent); font-weight: 650; }
+.student-loan-summary { margin: 14px 0; }
+.student-loan-summary .summary-block { margin-bottom: 0; }
+.loan-overview-home { margin: 14px 0; padding: 14px 16px; border: 1px solid var(--rule); border-radius: 12px; background: var(--accent-soft); }
+.loan-overview-row { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 10px 0; border-top: 1px solid rgba(39, 107, 82, 0.16); }
+.loan-overview-row p { margin: 3px 0 0; }
+.setup-steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 12px 0 16px; padding: 0; list-style: none; counter-reset: setup; }
+.setup-steps li { counter-increment: setup; padding: 10px 12px; border: 1px solid var(--rule); border-radius: 10px; background: #fff; color: var(--ink-soft); font-size: 0.84rem; }
+.setup-steps li::before { content: counter(setup); display: inline-grid; place-items: center; width: 21px; height: 21px; margin-right: 7px; border-radius: 50%; background: var(--accent); color: #fff; font-weight: 700; font-size: 0.75rem; }
+.student-loan-toggle { display: flex; align-items: flex-start; gap: 10px; margin: 12px 0; padding: 13px 14px; border: 1px solid var(--accent); border-radius: 11px; background: var(--accent-soft); cursor: pointer; }
+.student-loan-toggle input { margin-top: 3px; }
+.student-loan-toggle span { display: grid; gap: 3px; }
+.student-loan-toggle small { color: var(--ink-soft); }
+.mortgage-stress { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin: 12px 0; padding: 12px 14px; border: 1px solid var(--rule); border-radius: 11px; background: #fff; }
+.mortgage-stress span { padding: 5px 9px; border-radius: 999px; background: var(--paper); color: var(--ink-soft); font-family: var(--mono); font-size: 0.8rem; }
 
 .formula {
   background: #fff;
@@ -169,7 +302,7 @@ th { color: var(--ink-soft); font-weight: 600; border-bottom: 1px solid var(--ru
 
 .notice { color: var(--ink-soft); font-size: 0.85rem; margin-bottom: 12px; overflow-wrap: anywhere; }
 
-.achievability { background: var(--accent-soft); border-radius: 4px; padding: 10px 14px; margin-top: 10px; }
+.achievability { background: var(--accent-soft); border: 1px solid var(--rule); border-radius: 12px; padding: 12px 14px; margin-top: 12px; }
 .achievability p { margin: 4px 0; }
 .period-block.leave { opacity: 0.6; background: repeating-linear-gradient(45deg, #fff, #fff 8px, var(--rule) 8px, var(--rule) 9px); }
 .inline-check { font-size: 0.8rem; font-weight: normal; color: var(--ink-soft); }
@@ -193,6 +326,7 @@ footer.io-bar span { color: var(--ink-soft); font-size: 0.85rem; }
 .storage-status strong { color: var(--ink); }
 .storage-status small { grid-column: 1 / -1; line-height: 1.55; }
 .storage-status.failed #storage-status-text { color: var(--negative); }
+.storage-location-button { grid-column: 1 / -1; justify-self: start; margin-top: 4px; }
 .save-indicator { position: fixed; right: 16px; bottom: 16px; z-index: 30; display: flex; align-items: center; gap: 8px; max-width: min(430px, calc(100vw - 32px)); padding: 9px 12px; border: 1px solid var(--rule); border-radius: 999px; background: rgba(255, 253, 248, 0.96); box-shadow: 0 5px 20px rgba(50, 43, 35, 0.13); color: var(--ink-soft); font-size: 0.78rem; backdrop-filter: blur(8px); }
 .save-dot { width: 8px; height: 8px; flex: 0 0 auto; border-radius: 50%; background: var(--positive); }
 .save-indicator.failed .save-dot { background: var(--negative); }
@@ -200,6 +334,7 @@ footer.io-bar span { color: var(--ink-soft); font-size: 0.85rem; }
 .file-binding-name { overflow-wrap: anywhere; color: var(--ink); }
 
 @media (max-width: 720px) {
+  header.masthead { align-items: flex-start; flex-direction: column; gap: 12px; }
   header.masthead, nav.tabs, main { padding-left: 16px; padding-right: 16px; }
   main { width: 100vw; max-width: 100vw; overflow: hidden; }
   .tab-panel, .card { width: 100%; max-width: 100%; }
@@ -209,6 +344,14 @@ footer.io-bar span { color: var(--ink-soft); font-size: 0.85rem; }
   .dashboard-card { width: 100%; max-width: 100%; overflow: hidden; contain: inline-size; }
   #allocation-dashboard { width: 100%; max-width: 100%; overflow: hidden; }
   .health-grid { grid-template-columns: 1fr; }
+  .dashboard-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .summary-card-setting-row { grid-template-columns: 1fr; align-items: stretch; padding-bottom: 10px; border-bottom: 1px solid var(--rule); }
   .goal-picker { grid-template-columns: 1fr; }
   table.allocation-table { min-width: 650px; }
+  .estimator-controls { align-items: stretch; }
+  .estimator-controls .field, .estimator-controls .control-check { width: 100%; }
+  .scenario-actions .btn { flex: 1 1 140px; }
+  .estimator-field-grid, .estimator-option-grid { grid-template-columns: 1fr; }
+  .setup-steps { grid-template-columns: 1fr; }
+  .loan-overview-row { align-items: stretch; flex-direction: column; }
 }

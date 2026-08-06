@@ -8,6 +8,8 @@ const IO = (() => {
   let historyTimer = null;
   let fileSaveTimer = null;
   let boundFileHandle = null;
+  let fileWriteChain = Promise.resolve();
+  let lastLifecycleFlushAt = 0;
   const WORKSPACE_KEY = 'finance-tools.workspace.v1';
   const DB_NAME = 'finance-tools-local';
   const HISTORY_LIMIT = 20;
@@ -82,7 +84,7 @@ const IO = (() => {
       return boundFileHandle;
     } catch { boundFileHandle = null; return null; }
   };
-  const saveBoundFile = async ({ requestPermission = false } = {}) => {
+  const writeBoundFile = async ({ requestPermission = false } = {}) => {
     if (!boundFileHandle || !stateProvider) return false;
     try {
       let permission = await boundFileHandle.queryPermission({ mode: 'readwrite' });
@@ -100,9 +102,13 @@ const IO = (() => {
       return false;
     }
   };
+  const saveBoundFile = (options = {}) => {
+    fileWriteChain = fileWriteChain.then(() => writeBoundFile(options), () => writeBoundFile(options));
+    return fileWriteChain;
+  };
   const scheduleBoundFileSave = () => {
     clearTimeout(fileSaveTimer);
-    if (boundFileHandle) fileSaveTimer = setTimeout(() => saveBoundFile(), 1000);
+    if (boundFileHandle) fileSaveTimer = setTimeout(() => saveBoundFile(), 0);
   };
   const bindWorkspaceFile = async () => {
     if (!globalThis.showSaveFilePicker) throw new Error('此瀏覽器不支援工作區檔案綁定，請使用最新版 Edge 或 Chrome');
@@ -159,7 +165,20 @@ const IO = (() => {
     });
   };
 
+  const flushBeforeLeaving = () => {
+    const now = Date.now();
+    if (now - lastLifecycleFlushAt < 500) return;
+    lastLifecycleFlushAt = now;
+    clearTimeout(historyTimer);
+    clearTimeout(fileSaveTimer);
+    saveCurrent();
+    saveHistory();
+    if (boundFileHandle) saveBoundFile();
+  };
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') flushBeforeLeaving(); });
+  window.addEventListener('pagehide', flushBeforeLeaving);
   window.addEventListener('beforeunload', (e) => {
+    flushBeforeLeaving();
     if (!dirty) return;
     e.preventDefault();
     e.returnValue = '';

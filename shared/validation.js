@@ -53,12 +53,29 @@ const Validation = (() => {
     if (Array.isArray(s.items)) s.items.forEach((item, i) => {
       if (!item || typeof item.label !== 'string' || !finite(item.amountCents) || !integer(item.amountCents)) errors.push(error(`${path}.items[${i}]`, 'INVALID_ITEM', '項目必須包含名稱與整數分金額'));
     });
+    if (s.mortgage) {
+      if (!finite(s.mortgage.purchaseAge) || s.mortgage.purchaseAge < 0) errors.push(error(`${path}.mortgage.purchaseAge`, 'INVALID_AGE', '購屋年齡必須為非負數'));
+      if (!finite(s.mortgage.annualRate) || s.mortgage.annualRate < 0 || s.mortgage.annualRate > 0.20) errors.push(error(`${path}.mortgage.annualRate`, 'INVALID_RATE', '房貸年利率須介於 0%–20%'));
+      if (!finite(s.mortgage.termYears) || s.mortgage.termYears < 1) errors.push(error(`${path}.mortgage.termYears`, 'INVALID_TERM', '房貸年限至少一年'));
+      if (!finite(s.mortgage.graceYears) || s.mortgage.graceYears < 0 || s.mortgage.graceYears >= s.mortgage.termYears) errors.push(error(`${path}.mortgage.graceYears`, 'INVALID_TERM', '房貸寬限期必須小於總年限'));
+      if (!['estimated', 'manual'].includes(s.mortgage.principalMode || 'estimated')) errors.push(error(`${path}.mortgage.principalMode`, 'INVALID_MODE', '房貸本金來源不合法'));
+      if (s.mortgage.principalMode === 'manual' && (!finite(s.mortgage.manualPrincipalCents) || s.mortgage.manualPrincipalCents < 0)) errors.push(error(`${path}.mortgage.manualPrincipalCents`, 'INVALID_MONEY', '房貸未償本金必須為非負金額'));
+    }
     if (s.calcType === 'retirement_fund') {
       if (!integer(s.currentAge) || !integer(s.retireAge) || !integer(s.deathAge) || !(s.currentAge < s.retireAge && s.retireAge < s.deathAge)) errors.push(error(path, 'AGE_ORDER', '養老金必須符合目前年齡 < 退休年齡 < 預期壽命'));
       if (!finite(s.monthlyLivingCostCents) || s.monthlyLivingCostCents < 0) errors.push(error(`${path}.monthlyLivingCostCents`, 'INVALID_MONEY', '每月生活費必須是非負有限金額'));
     }
     if (s.calcType === 'periods') {
       if (!Array.isArray(s.itemTemplate) || !Array.isArray(s.periods)) errors.push(error(path, 'INVALID_PERIODS', '期別情境缺少範本或期別陣列'));
+      if (s.repayment) {
+        if (!finite(s.repayment.graduationAge) || s.repayment.graduationAge < 0) errors.push(error(`${path}.repayment.graduationAge`, 'INVALID_AGE', '預計畢業年齡必須為非負數'));
+        if (!finite(s.repayment.graceYears) || s.repayment.graceYears < 0) errors.push(error(`${path}.repayment.graceYears`, 'INVALID_TERM', '寬限年數必須為非負數'));
+        if (!finite(s.repayment.annualRate) || s.repayment.annualRate < 0 || s.repayment.annualRate > 0.20) errors.push(error(`${path}.repayment.annualRate`, 'INVALID_RATE', '學貸年利率須介於 0%–20%'));
+        if (!['standard', 'extended', 'low_income'].includes(s.repayment.termPlan)) errors.push(error(`${path}.repayment.termPlan`, 'INVALID_TERM', '學貸攤還方案不合法'));
+        if (!['estimated', 'manual'].includes(s.repayment.principalMode || 'estimated')) errors.push(error(`${path}.repayment.principalMode`, 'INVALID_MODE', '學貸本金來源不合法'));
+        if (s.repayment.principalMode === 'manual' && (!finite(s.repayment.manualPrincipalCents) || s.repayment.manualPrincipalCents < 0)) errors.push(error(`${path}.repayment.manualPrincipalCents`, 'INVALID_MONEY', '銀行未償本金必須為非負金額'));
+        if (!finite(s.repayment.reserveMonths) || s.repayment.reserveMonths < 0) errors.push(error(`${path}.repayment.reserveMonths`, 'INVALID_TERM', '預備金月數必須為非負數'));
+      }
     }
     if (s.calcType === 'fire') {
       if (!integer(s.startAge) || !integer(s.retireAge) || !integer(s.deathAge)) errors.push(error(path, 'INVALID_AGE', 'FIRE 年齡必須是整數'));

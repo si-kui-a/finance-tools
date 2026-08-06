@@ -9,8 +9,15 @@
 <body>
 
 <header class="masthead">
-  <h1>財務工具</h1>
-  <p>純本機運算・資料不外傳・匯入匯出以 JSON 檔案為準</p>
+  <div class="masthead-copy">
+    <h1>財務工具</h1>
+    <p>純本機運算・資料不外傳・匯入匯出以 JSON 檔案為準</p>
+  </div>
+  <div class="view-mode-control" role="group" aria-label="網頁檢視模式">
+    <span>頁面檢視</span>
+    <button type="button" class="view-mode-btn" data-view-mode="simple" aria-pressed="false">結論</button>
+    <button type="button" class="view-mode-btn" data-view-mode="detailed" aria-pressed="false">編輯</button>
+  </div>
 </header>
 
 <nav class="tabs">
@@ -21,36 +28,38 @@
 </nav>
 
 <main>
+  <div class="simple-mode-hint">
+    <span><strong>結論檢視</strong>　目前只顯示關鍵結果與警示。</span>
+    <button type="button" class="btn small" id="open-detailed-mode">編輯資料</button>
+  </div>
   <section id="panel-health" class="tab-panel active">
     <div class="card dashboard-card">
       <h2>本月資金分配</h2>
       <p class="notice">自動沿用固定出入帳、帳戶餘額與成本試算；只需選擇要納入的目標及搭配帳戶。</p>
       <div id="allocation-dashboard"></div>
     </div>
-    <div class="card">
+    <div class="card editor-only">
       <details>
       <summary>進階財務健檢與假設</summary>
       <p class="notice">全部以今日幣值規劃；不必先匯入帳本。結果是情境估算，不構成投資建議。</p>
       <div id="health-form"></div>
       </details>
     </div>
-    <div class="card">
-      <details>
-        <summary>查看詳細健檢結果與壓力情境</summary>
-        <div id="health-results"></div>
-      </details>
+    <div class="card conclusion-card">
+      <h2>財務健檢結論</h2>
+      <div id="health-results"></div>
     </div>
   </section>
 
   <section id="panel-ledger" class="tab-panel">
-    <div class="card" id="personal-settings"></div>
+    <div class="card edit-card" id="personal-settings"></div>
 
-    <div class="card">
+    <div class="card edit-card">
       <h3>新增紀錄</h3>
       <div id="ledger-form"></div>
     </div>
 
-    <div class="card">
+    <div class="card detail-card">
       <h3>明細</h3>
       <table>
         <thead>
@@ -64,10 +73,23 @@
   </section>
 
   <section id="panel-estimator" class="tab-panel">
-    <div class="card">
-      <div class="toolbar">
-        <label>選擇情境：<select id="scenario-select"></select></label>
-        <label><input type="checkbox" id="compare-toggle"> 比較「買房」與「買地自建」</label>
+    <div class="card estimator-shell">
+      <div class="section-heading">
+        <h2>成本試算</h2>
+        <p class="notice">選擇目標後只需調整必要欄位；金額、缺口與達成時間會自動連動更新。</p>
+      </div>
+      <div class="estimator-controls quick-action">
+        <div class="field wide">
+          <label for="scenario-select">試算情境</label>
+          <select id="scenario-select"></select>
+        </div>
+        <label class="control-check editor-only"><input type="checkbox" id="compare-toggle"> 比較買房與買地自建</label>
+      </div>
+      <div class="scenario-actions editor-only" aria-label="情境管理">
+        <button type="button" class="btn small" id="new-scenario">＋新增情境</button>
+        <button type="button" class="btn small" id="duplicate-scenario">複製目前情境</button>
+        <button type="button" class="btn small" id="rename-scenario">重新命名</button>
+        <button type="button" class="btn small danger" id="delete-scenario">刪除自訂情境</button>
       </div>
       <div id="estimator-body"></div>
     </div>
@@ -81,7 +103,7 @@
   </section>
 </main>
 
-<footer class="io-bar">
+<footer class="io-bar editor-only">
   <span>匯出：</span>
   <button class="btn small" id="export-ledger">帳本 JSON</button>
   <button class="btn small" id="export-config">設定 JSON</button>
@@ -94,6 +116,7 @@
   <div class="storage-status" id="storage-status">
     <strong>本機保存位置</strong>
     <span id="storage-status-text">正在檢查本機儲存空間…</span>
+    <button class="btn small storage-location-button" id="choose-storage-location" type="button">選擇本機保存位置</button>
     <small>工作資料會保存於目前 Edge 設定檔的本機站點資料；匯入的原始檔案不會被搬移。JSON 匯出的實際資料夾由瀏覽器下載設定決定。</small>
   </div>
 </footer>
