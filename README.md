@@ -2,6 +2,19 @@
 
 **把收入、支出、儲蓄與人生目標放在同一張財務地圖上。**
 
+## 下載與開始使用
+
+| 使用方式 | 立即前往 |
+| --- | --- |
+| 不使用 Git，直接下載 | [下載最新版 ZIP](https://github.com/si-kui-a/finance-tools/archive/refs/heads/main.zip) |
+| Windows 電腦 | [Windows 下載、安裝與瀏覽器載入](#安裝到-windows-電腦) |
+| Mac 電腦 | [Mac 下載、安裝與瀏覽器載入](#安裝到-mac) |
+| 使用 Git 安裝與更新 | [Windows Git 指令](#windows使用-git方便更新)・[Mac Git 指令](#mac使用-git方便更新) |
+| 已經下載完成 | [第一次開啟與設定](#第一次使用) |
+| 查看原始碼與版本 | [GitHub 公開倉庫](https://github.com/si-kui-a/finance-tools) |
+
+目前採本機版使用：下載後開啟資料夾內的 `index.html`。尚未提供正式的 GitHub Pages 線上版，因此不需要登入，也不會把輸入資料送到網站伺服器。
+
 錢路是一套免費、純本機的繁體中文個人理財工具，整合記帳、多帳戶管理、每月資金分配、儲蓄率分析，以及房貸、學貸、買房、旅行與退休試算。資料只需輸入一次，各項結果便會自動連動；不需註冊、不依賴 AI，也不會把財務資料傳到伺服器。
 
 > 適合想知道「每月能存多少、每天能花多少、目標何時達成」的人。
@@ -34,40 +47,40 @@
 
 錢路不需要安裝程式，也不需要 Node.js 才能使用。只要下載專案並用瀏覽器載入 `index.html`。
 
-### 方法一：下載 ZIP（最簡單）
+### Windows：下載 ZIP（最簡單）
 
 1. 在 GitHub 專案頁按 **Code → Download ZIP**。
-2. 解壓縮後，將整個資料夾移到：
+2. 解壓縮後，把資料夾改名為 `MoneyPath`，移到自己的「文件」資料夾：
 
    ```text
-   C:\Projects\finance-tools
+   C:\Users\<你的帳號>\Documents\MoneyPath
    ```
 
 3. 在檔案總管開啟下列檔案：
 
    ```text
-   C:\Projects\finance-tools\index.html
+   C:\Users\<你的帳號>\Documents\MoneyPath\index.html
    ```
 
 4. 也可以把下列網址貼到 Edge 或 Chrome 網址列：
 
    ```text
-   file:///C:/Projects/finance-tools/index.html
+   file:///C:/Users/<你的帳號>/Documents/MoneyPath/index.html
    ```
 
 5. 建議為 `index.html` 建立桌面捷徑，以後雙擊即可使用。
 
-> 若解壓後多出一層 `finance-tools-main`，實際載入路徑會是 `C:\Projects\finance-tools-main\index.html`。以含有 `index.html`、`shared` 與 `README.md` 的那一層為準。
+> `<你的帳號>` 需換成目前的 Windows 使用者資料夾名稱。若「文件」已由 OneDrive 接管，實際位置可能包含 `OneDrive`；直接在檔案總管雙擊 `index.html` 最可靠。以含有 `index.html`、`shared` 與 `README.md` 的資料夾為準。
 
-### 方法二：使用 Git（方便更新）
+### Windows：使用 Git（方便更新）
 
 在 PowerShell 執行：
 
 ```powershell
-New-Item -ItemType Directory -Path C:\Projects -Force
-Set-Location C:\Projects
-git clone https://github.com/si-kui-a/finance-tools.git
-Set-Location .\finance-tools
+$moneyPathDocuments = [Environment]::GetFolderPath('MyDocuments')
+Set-Location $moneyPathDocuments
+git clone https://github.com/si-kui-a/finance-tools.git MoneyPath
+Set-Location .\MoneyPath
 Start-Process .\index.html
 ```
 
@@ -75,21 +88,77 @@ Start-Process .\index.html
 
 | 用途 | 路徑 |
 | --- | --- |
-| 專案資料夾 | `C:\Projects\finance-tools` |
-| 網頁入口 | `C:\Projects\finance-tools\index.html` |
-| 瀏覽器載入網址 | `file:///C:/Projects/finance-tools/index.html` |
-| 共用程式 | `C:\Projects\finance-tools\shared` |
-| 範例資料 | `C:\Projects\finance-tools\sample-data` |
-| 建議的個人備份檔 | `C:\Projects\finance-tools-data\money-path-workspace.json` |
+| 專案資料夾 | `C:\Users\<你的帳號>\Documents\MoneyPath` |
+| 網頁入口 | `C:\Users\<你的帳號>\Documents\MoneyPath\index.html` |
+| 瀏覽器載入網址 | `file:///C:/Users/<你的帳號>/Documents/MoneyPath/index.html` |
+| 共用程式 | `C:\Users\<你的帳號>\Documents\MoneyPath\shared` |
+| 範例資料 | `C:\Users\<你的帳號>\Documents\MoneyPath\sample-data` |
+| 建議的個人備份檔 | `C:\Users\<你的帳號>\Documents\MoneyPath Data\money-path-workspace.json` |
 
 更新程式時，在 PowerShell 執行：
 
 ```powershell
-Set-Location C:\Projects\finance-tools
+$moneyPathDocuments = [Environment]::GetFolderPath('MyDocuments')
+Set-Location (Join-Path $moneyPathDocuments 'MoneyPath')
 git pull
 ```
 
-個人工作區 JSON 請放在獨立的 `C:\Projects\finance-tools-data`，不要放進 `finance-tools` 公開程式碼資料夾，避免日後被 Git 誤提交。
+個人工作區 JSON 請放在專案外的 `MoneyPath Data` 資料夾，不要放進 `MoneyPath` 公開程式碼資料夾，避免日後被 Git 誤提交。
+
+## 安裝到 Mac
+
+macOS 同樣不需要安裝程式或 Node.js。下載後以 Safari、Chrome 或 Edge 開啟 `index.html` 即可；若要把工作區直接綁定至本機 JSON 檔案，建議使用最新版 Chrome 或 Edge。
+
+### Mac：下載 ZIP（最簡單）
+
+1. 在 GitHub 專案頁按 **Code → Download ZIP**。
+2. 在 Finder 的「下載項目」雙擊 ZIP 解壓縮。
+3. 將資料夾改名為 `MoneyPath`，再移到自己的「文件」資料夾：
+
+   ```text
+   /Users/<你的帳號>/Documents/MoneyPath
+   ```
+
+4. 在 Finder 開啟 `MoneyPath`，雙擊 `index.html`；或在瀏覽器網址列輸入：
+
+   ```text
+   file:///Users/<你的帳號>/Documents/MoneyPath/index.html
+   ```
+
+> `<你的帳號>` 是 Mac 的短使用者名稱。可在「終端機」執行 `whoami` 查詢；不要把中文顯示名稱直接當成路徑。
+
+### Mac：使用 Git（方便更新）
+
+先確認 Mac 已安裝 Git，再於「終端機」執行：
+
+```bash
+cd ~/Documents
+git clone https://github.com/si-kui-a/finance-tools.git MoneyPath
+cd MoneyPath
+open index.html
+```
+
+安裝完成後的對應路徑：
+
+| 用途 | macOS 路徑 |
+| --- | --- |
+| 專案資料夾 | `~/Documents/MoneyPath` |
+| 網頁入口 | `~/Documents/MoneyPath/index.html` |
+| 瀏覽器載入網址 | `file:///Users/<你的帳號>/Documents/MoneyPath/index.html` |
+| 共用程式 | `~/Documents/MoneyPath/shared` |
+| 範例資料 | `~/Documents/MoneyPath/sample-data` |
+| 建議的個人備份檔 | `~/Documents/MoneyPath Data/money-path-workspace.json` |
+
+更新程式時，在「終端機」執行：
+
+```bash
+cd ~/Documents/MoneyPath
+git pull
+```
+
+個人工作區 JSON 請放在專案外的 `~/Documents/MoneyPath Data`，不要放進 `MoneyPath` 公開程式碼資料夾。Safari 可以使用瀏覽器本機保存與 JSON 匯入／匯出；若「選擇本機保存位置」不可用，請改用 Chrome／Edge，或定期按匯出下載備份。
+
+> 如果 Windows「文件」由 OneDrive 同步，或 Mac「文件」由 iCloud Drive 同步，放在其中的檔案可能會上傳雲端。希望資料嚴格留在單機時，請在未同步的本機資料夾建立 `MoneyPath` 與 `MoneyPath Data`；程式可從任何有讀取權限的位置載入。
 
 ## 第一次使用
 
