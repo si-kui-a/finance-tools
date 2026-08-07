@@ -1613,6 +1613,40 @@ const App = (() => {
     });
   };
 
+  const importInvoices = (invoices, account) => {
+    const result = InvoiceSync.mergeInvoices(ledger, invoices, { account });
+    if (result.added.length) { renderLedger(); renderHealth(); IO.markDirty(); }
+    return result;
+  };
+
+  const initInvoiceSync = () => {
+    if (!$('#invoice-sync-card')) return;
+    ensureAccountProfiles();
+    const account = $('#invoice-account');
+    account.innerHTML = config.accountProfiles.map(item => `<option value="${item.id}">${item.name}</option>`).join('');
+    const today = new Date(), start = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+    $('#invoice-start-date').value = start.toISOString().slice(0, 10);
+    $('#invoice-end-date').value = today.toISOString().slice(0, 10);
+    const status = $('#invoice-sync-status');
+    fetch('http://127.0.0.1:8787/health').then(response => response.json()).then(info => {
+      status.textContent = info.ready ? `本機服務已就緒（${info.environment === 'production' ? '正式區' : '測試區'}）` : '本機服務已啟動，但尚未設定財政部 AppID。';
+    }).catch(() => { status.textContent = '本機 companion service 尚未啟動。請依 README 操作。'; });
+    $('#sync-invoices').addEventListener('click', async () => {
+      const button = $('#sync-invoices'); button.disabled = true; status.textContent = '正在向財政部查詢並取得明細…';
+      try {
+        const response = await fetch('http://127.0.0.1:8787/sync', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({
+          cardNo: $('#invoice-card-no').value.trim(), cardEncrypt: $('#invoice-card-password').value,
+          startDate: $('#invoice-start-date').value.replaceAll('-', '/'), endDate: $('#invoice-end-date').value.replaceAll('-', '/'), consent: $('#invoice-consent').checked
+        }) });
+        const data = await response.json(); if (!response.ok) throw new Error(data.error || '同步失敗');
+        const result = importInvoices(data.invoices, account.value || null);
+        status.textContent = `同步完成：新增 ${result.added.length} 筆、跳過 ${result.skipped.length} 筆、錯誤 ${result.errors.length} 筆。分類結果請人工確認。`;
+        $('#invoice-card-password').value = ''; $('#invoice-consent').checked = false;
+      } catch (error) { status.textContent = `同步失敗：${error.message}`; }
+      finally { button.disabled = false; }
+    });
+  };
+
   const init = () => {
     IO.configurePersistence(workspaceSnapshot, updateStorageStatus);
     const saved = IO.loadWorkspace();
@@ -1631,9 +1665,10 @@ const App = (() => {
     renderWageReverse();
     initViewMode();
     initIO();
+    initInvoiceSync();
   };
 
-  return { init };
+  return { init, importInvoices };
 })();
 
 document.addEventListener('DOMContentLoaded', App.init);

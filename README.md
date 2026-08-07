@@ -170,6 +170,29 @@ git pull
 
 不必先整理完整帳本。只有收入與支出，也能立即得到每月結餘、儲蓄率和每日可用生活費。
 
+## 與發票怪獸並行：同步財政部載具
+
+本功能不是讀取發票怪獸帳號，而是讓兩套工具共用同一個財政部手機條碼資料源。發票怪獸可照常使用；錢路只把使用者本次同意查詢的發票轉成帳本支出。
+
+### 啟用前置條件
+
+1. 開發者須先依財政部規定申請並取得 AppID/APIKey；未核准前只能使用測試區，不能查詢真實發票。
+2. 安裝 Node.js 18 以上版本。
+3. 在 PowerShell 設定當次終端機的環境變數並啟動本機服務：
+
+   ```powershell
+   $env:MOF_EINVOICE_APP_ID='財政部核發的 AppID'
+   $env:MOF_EINVOICE_API_KEY='財政部核發的 APIKey'
+   $env:MOF_EINVOICE_ENV='test' # 正式核准後才改為 production
+   npm run invoice:companion
+   ```
+
+4. 保持該視窗開啟，再開啟 `index.html`，到「帳本 → 載具發票同步」。
+
+安全與資料處理：服務只監聽本機 `127.0.0.1:8787`；AppID/APIKey 只從環境變數讀取；手機條碼驗證碼只用於當次請求，不寫入工作區或磁碟。同步以發票號碼與日期去重，已捐贈發票不匯入，分類屬規則推估，匯入後仍應人工核對。財政部目前規範亦要求取得使用者同意、提供停止與刪除權利、每半年重新同意，以及提供雲端發票捐贈功能；正式發布前須完成申請審查與法遵確認。
+
+官方文件：[電子發票應用 API 規格](https://www.einvoice.nat.gov.tw/static/ptl/ein_upload/download/5160.pdf)・[API 使用規範](https://law-out.mof.gov.tw/LawContent.aspx?id=GL010122)
+
 ## 設計原則
 
 - **輸入一次，全站連動**：優先沿用已有資料，自動推導可計算的數值。

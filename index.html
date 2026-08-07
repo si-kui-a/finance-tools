@@ -55,6 +55,24 @@
   <section id="panel-ledger" class="tab-panel">
     <div class="card edit-card" id="personal-settings"></div>
 
+    <div class="card edit-card" id="invoice-sync-card">
+      <h3>載具發票同步</h3>
+      <p class="notice">與發票怪獸共用同一個財政部手機條碼資料源。驗證碼只傳給本機 companion service，本工具不保存。</p>
+      <div class="form-grid">
+        <div class="field"><label for="invoice-card-no">手機條碼</label><input id="invoice-card-no" autocomplete="off" placeholder="/ABC+123"></div>
+        <div class="field"><label for="invoice-card-password">載具驗證碼</label><input id="invoice-card-password" type="password" autocomplete="off"></div>
+        <div class="field"><label for="invoice-start-date">開始日期</label><input id="invoice-start-date" type="date"></div>
+        <div class="field"><label for="invoice-end-date">結束日期</label><input id="invoice-end-date" type="date"></div>
+        <div class="field"><label for="invoice-account">記入帳戶</label><select id="invoice-account"></select></div>
+      </div>
+      <label class="control-check"><input id="invoice-consent" type="checkbox"> 我同意本次查詢並將發票資料轉為本機帳本紀錄</label>
+      <div class="quick-action">
+        <button class="btn" id="sync-invoices" type="button">同步財政部載具</button>
+        <a class="btn small" href="https://www.einvoice.nat.gov.tw/" target="_blank" rel="noopener noreferrer">管理／捐贈雲端發票</a>
+      </div>
+      <p class="notice" id="invoice-sync-status" role="status" aria-live="polite">需先啟動本機 companion service；未取得財政部 AppID 前維持停用。</p>
+    </div>
+
     <div class="card edit-card">
       <h3>新增紀錄</h3>
       <div id="ledger-form"></div>
@@ -133,6 +151,7 @@
 <script src="shared/planning.js"></script>
 <script src="shared/money.js"></script>
 <script src="shared/io.js"></script>
+<script src="shared/invoice-sync.js"></script>
 <script src="shared/app.js"></script>
 </body>
 </html>
