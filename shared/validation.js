@@ -21,8 +21,10 @@ const Validation = (() => {
       if (!finite(p[key]) || p[key] < 0) errors.push(error(key, 'INVALID_MONEY', `${key} 必須是大於或等於 0 的有限金額`));
     }
     if (!isValidMonth(p.goalTargetMonth)) errors.push(error('goalTargetMonth', 'INVALID_MONTH', '目標月份必須是 YYYY-MM'));
-    if (!finite(p.inflationAnnualRate) || p.inflationAnnualRate <= -1 || p.inflationAnnualRate > 0.20) errors.push(error('inflationAnnualRate', 'OUT_OF_RANGE', '年通膨率須大於 -100% 且不高於 20%'));
-    if (!finite(p.nominalReturnAnnualRate) || p.nominalReturnAnnualRate <= -1 || p.nominalReturnAnnualRate > 0.50) errors.push(error('nominalReturnAnnualRate', 'OUT_OF_RANGE', '名目年報酬率須大於 -100% 且不高於 50%'));
+    if (!finite(p.inflationAnnualRate) || p.inflationAnnualRate <= -1 || p.inflationAnnualRate > 0.20) errors.push(error('inflationAnnualRate', 'OUT_OF_RANGE', '年通膨率須大於 −100% 且不高於 20%'));
+    if (p.emergencyTargetMonths !== undefined && (!finite(p.emergencyTargetMonths) || p.emergencyTargetMonths < 3 || p.emergencyTargetMonths > 18)) errors.push(error('emergencyTargetMonths', 'OUT_OF_RANGE', '緊急預備金目標須介於 3–18 個月'));
+    if (p.emergencyReserveCents !== undefined && (!finite(p.emergencyReserveCents) || p.emergencyReserveCents < 0)) errors.push(error('emergencyReserveCents', 'INVALID_MONEY', '指定緊急預備金必須是非負有限金額'));
+    if (!finite(p.nominalReturnAnnualRate) || p.nominalReturnAnnualRate <= -1 || p.nominalReturnAnnualRate > 0.50) errors.push(error('nominalReturnAnnualRate', 'OUT_OF_RANGE', '名目年報酬率須大於 −100% 且不高於 50%'));
     return { valid: errors.length === 0, errors, warnings: [] };
   };
 
@@ -46,12 +48,36 @@ const Validation = (() => {
     return { valid: errors.length === 0, errors, warnings: [] };
   };
 
+  const normalizeScenario = (scenario) => {
+    const s = structuredClone(scenario);
+    const normalizeItems = (items) => Array.isArray(items) ? items.map((item) => {
+      if (!item || typeof item !== "object") return item;
+      const legacyDiscount = item.kind === undefined && (Number(item.amountCents) < 0 || /折扣|減免|補助/.test(String(item.label || "")));
+      const kind = item.kind === "discount" || legacyDiscount ? "discount" : (item.kind || "cost");
+      const amountCents = Number.isFinite(item.amountCents) ? Math.abs(item.amountCents) : item.amountCents;
+      return { ...item, kind, amountCents };
+    }) : items;
+    if (Array.isArray(s.items)) s.items = normalizeItems(s.items);
+    if (Array.isArray(s.itemTemplate)) s.itemTemplate = normalizeItems(s.itemTemplate);
+    const discountLabels = new Set((s.itemTemplate || []).filter(item => item?.kind === "discount").map(item => item.label));
+    if (Array.isArray(s.periods)) s.periods = s.periods.map(period => {
+      if (!period || typeof period !== "object" || !period.overrides || typeof period.overrides !== "object") return period;
+      const overrides = Object.fromEntries(Object.entries(period.overrides).map(([label, value]) => [
+        label,
+        discountLabels.has(label) && Number.isFinite(value) ? Math.abs(value) : value
+      ]));
+      return { ...period, overrides };
+    });
+    return s;
+  };
+
   const validateScenario = (s, path = 'scenario') => {
     const errors = [];
     if (!s || typeof s !== 'object') return { valid: false, errors: [error(path, 'INVALID_SCENARIO', '情境必須是物件')], warnings: [] };
     if (typeof s.scenarioId !== 'string' || !s.scenarioId) errors.push(error(`${path}.scenarioId`, 'MISSING_ID', '情境缺少 scenarioId'));
+    if (s.calcType !== undefined && !['items', 'periods', 'retirement_fund', 'fire'].includes(s.calcType)) errors.push(error(path + '.calcType', 'INVALID_TYPE', 'Unsupported scenario type'));
     if (Array.isArray(s.items)) s.items.forEach((item, i) => {
-      if (!item || typeof item.label !== 'string' || !finite(item.amountCents) || !integer(item.amountCents)) errors.push(error(`${path}.items[${i}]`, 'INVALID_ITEM', '項目必須包含名稱與整數分金額'));
+      if (!item || typeof item.label !== "string" || !item.label.trim() || !["cost", "discount"].includes(item.kind || "cost") || !finite(item.amountCents) || !integer(item.amountCents) || item.amountCents < 0) errors.push(error(path + ".items[" + i + "]", "INVALID_ITEM", "項目必須包含名稱、類型與非負整數分金額"));
     });
     if (s.mortgage) {
       if (!finite(s.mortgage.purchaseAge) || s.mortgage.purchaseAge < 0) errors.push(error(`${path}.mortgage.purchaseAge`, 'INVALID_AGE', '購屋年齡必須為非負數'));
@@ -67,6 +93,9 @@ const Validation = (() => {
     }
     if (s.calcType === 'periods') {
       if (!Array.isArray(s.itemTemplate) || !Array.isArray(s.periods)) errors.push(error(path, 'INVALID_PERIODS', '期別情境缺少範本或期別陣列'));
+      if (Array.isArray(s.itemTemplate)) s.itemTemplate.forEach((item, i) => {
+        if (!item || typeof item.label !== "string" || !item.label.trim() || !['cost', 'discount'].includes(item.kind || 'cost') || !finite(item.amountCents) || !integer(item.amountCents) || item.amountCents < 0) errors.push(error(`${path}.itemTemplate[${i}]`, "INVALID_ITEM", "期別項目必須包含名稱、類型與非負整數分金額"));
+      });
       if (s.repayment) {
         if (!finite(s.repayment.graduationAge) || s.repayment.graduationAge < 0) errors.push(error(`${path}.repayment.graduationAge`, 'INVALID_AGE', '預計畢業年齡必須為非負數'));
         if (!finite(s.repayment.graceYears) || s.repayment.graceYears < 0) errors.push(error(`${path}.repayment.graceYears`, 'INVALID_TERM', '寬限年數必須為非負數'));
@@ -81,7 +110,15 @@ const Validation = (() => {
       if (!integer(s.startAge) || !integer(s.retireAge) || !integer(s.deathAge)) errors.push(error(path, 'INVALID_AGE', 'FIRE 年齡必須是整數'));
       else if (!(s.startAge < s.retireAge && s.retireAge < s.deathAge)) errors.push(error(path, 'AGE_ORDER', '必須符合開始工作年齡 < 退休年齡 < 預期壽命'));
       if (!finite(s.postRetirementAnnualReturnRate) || s.postRetirementAnnualReturnRate < 0 || s.postRetirementAnnualReturnRate > 0.20) errors.push(error(`${path}.postRetirementAnnualReturnRate`, 'INVALID_RATE', '退休後年化報酬率須介於 0%–20%'));
-      if (!finite(s.assumedSalaryGrowthRate) || s.assumedSalaryGrowthRate <= -1 || s.assumedSalaryGrowthRate > 0.50) errors.push(error(`${path}.assumedSalaryGrowthRate`, 'INVALID_RATE', '薪資成長率須大於 -100% 且不高於 50%'));
+      if (!['perpetuity', 'finite'].includes(s.retirementFundingModel || 'perpetuity')) errors.push(error(path + '.retirementFundingModel', 'INVALID_MODEL', 'Invalid retirement funding model'));
+      if (s.retirementInflationAnnualRate !== undefined && (!finite(s.retirementInflationAnnualRate) || s.retirementInflationAnnualRate < 0 || s.retirementInflationAnnualRate > 0.20)) errors.push(error(path + '.retirementInflationAnnualRate', 'INVALID_RATE', '退休後通膨率須介於 0%–20%'));
+      if ((s.retirementFundingModel || 'perpetuity') === 'perpetuity' && s.retirementInflationAnnualRate !== undefined && s.postRetirementAnnualReturnRate <= s.retirementInflationAnnualRate) errors.push(error(path + '.retirementInflationAnnualRate', 'UNSUSTAINABLE_WITHDRAWAL', '永續模型要求退休後報酬率高於退休後通膨率'));
+      const fireMoneyFields = ["currentMonthlySalaryCents", "currentMonthlyExpenseCents", "retirementMonthlyExpenseCents", "totalSavedCents", "buyHouseGoalCents", "studyAbroadFundCents", "insuredSalaryCents"];
+      fireMoneyFields.forEach((key) => { if (!finite(s[key]) || s[key] < 0) errors.push(error(`${path}.${key}`, "INVALID_MONEY", `${key} 必須是非負有限金額`)); });
+      if (!finite(s.emergencyFundMonths) || s.emergencyFundMonths < 0 || s.emergencyFundMonths > 120) errors.push(error(`${path}.emergencyFundMonths`, "INVALID_TERM", "FIRE 緊急預備金月數須介於 0–120 個月"));
+      if (!s.allocationPercents || typeof s.allocationPercents !== "object" || Array.isArray(s.allocationPercents)) errors.push(error(`${path}.allocationPercents`, "INVALID_ALLOCATION", "薪資分配比例格式不合法"));
+      else Object.entries(s.allocationPercents).forEach(([key, pct]) => { if (!finite(pct) || pct < 0 || pct > 1) errors.push(error(`${path}.allocationPercents.${key}`, "INVALID_ALLOCATION", "每項薪資分配比例須介於 0%–100%")); });
+      if (!finite(s.assumedSalaryGrowthRate) || s.assumedSalaryGrowthRate <= -1 || s.assumedSalaryGrowthRate > 0.50) errors.push(error(`${path}.assumedSalaryGrowthRate`, 'INVALID_RATE', '薪資成長率須大於 −100% 且不高於 50%'));
       const preRetirementRate = s.preRetirementAnnualReturnRate ?? 0;
       if (!finite(preRetirementRate) || preRetirementRate < 0 || preRetirementRate > 0.50) errors.push(error(`${path}.preRetirementAnnualReturnRate`, 'INVALID_RATE', '退休前年報酬率須介於 0%–50%'));
     }
@@ -130,6 +167,42 @@ const Validation = (() => {
     return { valid: errors.length === 0, errors, warnings: [] };
   };
 
+  const validateWorkspace = (data) => {
+    const errors = [];
+    if (!data || typeof data !== "object" || !data.config || !data.ledger || !Array.isArray(data.scenarios)) return { valid: false, errors: [error("", "INVALID_WORKSPACE", "工作區缺少設定、帳本或情境")], warnings: [] };
+    errors.push(...validateQuickPlan(data.config.quickPlan || {}).errors);
+    errors.push(...validateLedger(data.ledger).errors);
+    errors.push(...validateScenarios({ scenarios: data.scenarios }).errors);
+    const profiles = Array.isArray(data.config.accountProfiles) ? data.config.accountProfiles : [];
+    const accountIds = new Set();
+    const accountKeys = new Set();
+    profiles.forEach((account, index) => { if (!account || typeof account.id !== "string" || !account.id || accountIds.has(account.id)) errors.push(error(`config.accountProfiles[${index}].id`, "INVALID_ACCOUNT", "帳戶 ID 不可空白或重複")); else { accountIds.add(account.id); accountKeys.add(account.id); if (typeof account.name === "string" && account.name) accountKeys.add(account.name); } });
+    data.ledger.entries.forEach((entry, index) => { ["account", "fromAccount", "toAccount"].forEach((key) => { if (entry[key] !== undefined && entry[key] !== null && !accountKeys.has(entry[key])) errors.push(error(`ledger.entries[${index}].${key}`, "MISSING_ACCOUNT", "帳本指定的帳戶不存在")); }); });
+    const dashboard = data.config.dashboard || {};
+    ["livingAccountId", "fixedExpenseAccountId", "emergencyAccountId"].forEach((key) => { if (dashboard[key] !== undefined && dashboard[key] !== null && !accountIds.has(dashboard[key])) errors.push(error(`config.dashboard.${key}`, "MISSING_ACCOUNT", "首頁指定帳戶不存在")); });
+    const flows = data.config.recurringCashFlows || [];
+    errors.push(...validateRecurringFlows(flows).errors);
+    flows.forEach((flow, index) => { ["accountId", "fromAccountId"].forEach((key) => { if (flow[key] !== undefined && !accountKeys.has(flow[key])) errors.push(error(`config.recurringCashFlows[${index}].${key}`, "MISSING_ACCOUNT", "固定項目指定的帳戶不存在")); }); });
+    const managedIds = new Map([
+      ['system-student-loan-repayment', { systemManaged: 'student_loan', source: 'scenario:student_loan' }],
+      ['system-mortgage-repayment', { systemManaged: 'mortgage', source: 'scenario:mortgage' }]
+    ]);
+    const managedSources = new Set();
+    flows.forEach((flow, index) => {
+      const expected = managedIds.get(flow?.id) || [...managedIds.values()].find(item => item.source === flow?.source || item.systemManaged === flow?.systemManaged);
+      if (!expected) return;
+      if (flow.systemManaged && flow.systemManaged !== expected.systemManaged) errors.push(error('config.recurringCashFlows[' + index + '].systemManaged', 'INVALID_SOURCE', '自動固定支出的來源類型不一致'));
+      if (flow.source && flow.source !== expected.source) errors.push(error('config.recurringCashFlows[' + index + '].source', 'INVALID_SOURCE', '自動固定支出的來源不一致'));
+      if (managedSources.has(expected.source)) errors.push(error('config.recurringCashFlows[' + index + '].source', 'DUPLICATE_SOURCE', '同一情境不可產生多筆自動固定支出'));
+      managedSources.add(expected.source);
+    });
+    if (data.wageReverseScenario !== undefined) errors.push(...validateWage(data.wageReverseScenario).errors);
+    const scenarioIds = new Set(data.scenarios.map(s => s?.scenarioId).filter(Boolean));
+    Object.keys(dashboard.scenarioSelections || {}).forEach((id) => { if (!scenarioIds.has(id)) errors.push(error('config.dashboard.scenarioSelections.' + id, 'MISSING_SCENARIO', '首頁選取的情境不存在')); });
+    Object.keys(dashboard.scenarioTargetMonths || {}).forEach((id) => { if (!scenarioIds.has(id) || !isValidMonth(dashboard.scenarioTargetMonths[id])) errors.push(error('config.dashboard.scenarioTargetMonths.' + id, 'INVALID_TARGET_MONTH', '首頁情境目標月份無效或情境不存在')); });
+    return { valid: errors.length === 0, errors, warnings: [] };
+  };
+
   const validateImported = (data, kind) => {
     if (!data || typeof data !== 'object' || Array.isArray(data)) return { valid: false, errors: [error('', 'INVALID_ROOT', 'JSON 根節點必須是物件')], warnings: [] };
     if (!integer(data.schemaVersion)) return { valid: false, errors: [error('schemaVersion', 'MISSING_VERSION', '資料缺少整數 schemaVersion')], warnings: [] };
@@ -137,5 +210,5 @@ const Validation = (() => {
     return { valid: true, errors: [], warnings: [] };
   };
 
-  return { finite, isValidDate, isValidMonth, validateQuickPlan, validateLedger, validateScenario, validateScenarios, validateWage, validateRecurringFlows, validateImported };
+  return { finite, isValidDate, isValidMonth, normalizeScenario, validateQuickPlan, validateLedger, validateScenario, validateScenarios, validateWage, validateRecurringFlows, validateWorkspace, validateImported };
 })();

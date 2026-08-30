@@ -355,3 +355,80 @@ footer.io-bar span { color: var(--ink-soft); font-size: 0.85rem; }
   .setup-steps { grid-template-columns: 1fr; }
   .loan-overview-row { align-items: stretch; flex-direction: column; }
 }
+
+/* 全站元件規格：所有分頁共用同一套表單、結果、狀態與互動呈現。 */
+:root {
+  --radius-sm: 10px;
+  --focus-ring: 0 0 0 3px rgba(39, 107, 82, 0.14);
+  --space-section: 16px;
+}
+
+button, input, select, textarea { font: inherit; }
+button, select, input[type= checkbox], input[type=radio] { cursor: pointer; }
+button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+
+h2, h3, h4 { color: var(--ink); }
+h2 { letter-spacing: -0.01em; }
+.card { padding: 20px; margin: var(--space-section) 0; }
+
+.field input, .field select, .field textarea,
+.goal-picker select, .goal-picker input[type=month],
+.compact-settings select,
+.summary-card-setting-row input[type=text], .summary-card-setting-row select,
+#estimator-body input:not([type=checkbox]), #estimator-body select {
+  min-height: 40px;
+  padding: 9px 11px;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-sm);
+  background: var(--paper-card);
+  color: var(--ink);
+  transition: border-color .15s ease, box-shadow .15s ease, background .15s ease;
+}
+.field input:focus, .field select:focus, .field textarea:focus,
+.goal-picker select:focus, .goal-picker input:focus,
+.compact-settings select:focus,
+.summary-card-setting-row input[type=text]:focus, .summary-card-setting-row select:focus,
+#estimator-body input:focus, #estimator-body select:focus { outline: none; border-color: var(--accent); box-shadow: var(--focus-ring); }
+.field input:disabled, .field select:disabled, #estimator-body input:disabled, #estimator-body select:disabled { background: var(--paper); color: var(--ink-soft); cursor: not-allowed; }
+
+.btn { min-height: 40px; border-radius: var(--radius-sm); box-shadow: 0 2px 5px rgba(28, 67, 52, 0.08); transition: background .15s ease, transform .15s ease, box-shadow .15s ease; }
+.btn.small { min-height: 36px; border-radius: 9px; }
+.btn:hover { box-shadow: 0 4px 10px rgba(28, 67, 52, 0.14); }
+.btn.danger:hover { background: #842F3D; }
+.btn:focus-visible { box-shadow: var(--focus-ring), 0 2px 5px rgba(28, 67, 52, 0.08); }
+
+.summary-block { margin-bottom: 0; padding: 14px 16px; border: 1px solid var(--rule); border-radius: 12px; background: var(--paper-card); }
+.summary-block.highlight { border-color: #CBE3D6; }
+.summary-block h3 { margin-bottom: 8px; }
+.health-grid, .dashboard-summary { align-items: stretch; }
+.dashboard-mini-card { padding: 14px 16px; border-radius: 12px; }
+
+.result-block, .achievability, .estimator-section, .period-block, .loan-overview-home, .mortgage-stress, .linked-note, .student-loan-toggle {
+  border-radius: 12px;
+}
+.result-block { padding: 16px; border: 1px solid var(--rule); background: var(--paper-card); }
+.formula { margin: 8px 0 0; border-radius: var(--radius-sm); background: var(--paper); line-height: 1.6; }
+.notice { line-height: 1.55; }
+
+.compact-settings { padding: 12px 0; }
+.compact-settings summary, details > summary { min-height: 36px; padding: 8px 0; color: var(--accent); }
+.compact-settings summary:focus-visible, details > summary:focus-visible { outline: none; border-radius: 6px; box-shadow: var(--focus-ring); }
+
+.table-scroll { border-radius: var(--radius-sm); }
+table { margin-top: 12px; }
+th { background: var(--paper); white-space: nowrap; }
+tbody tr:hover { background: rgba(229, 241, 235, 0.52); }
+tbody tr:last-child td { border-bottom: 0; }
+
+.savings-issues, .savings-strengths { border-radius: 12px; line-height: 1.55; }
+.loan-overview-home { margin: var(--space-section) 0; padding: 16px; }
+.estimator-controls, .estimator-section { background: #FAFCFB; }
+
+@media (max-width: 720px) {
+  .card { padding: 16px; }
+  .btn { min-height: 42px; }
+  .btn.small { min-height: 38px; }
+  .dashboard-summary { gap: 8px; }
+  .dashboard-mini-card { padding: 12px; }
+  th, td { padding: 9px 8px; }
+}

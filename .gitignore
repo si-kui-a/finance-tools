@@ -5,3 +5,7 @@
 /estimator_*.json
 /wage_reverse_*.json
 /loan_*.json
+
+# 2026-08-14發現：使用者自建的記帳工作區資料夾，內容是真實財務資料匯出
+# （ledger/currentMonthlySalaryCents等欄位），不在上面既有pattern範圍內
+/記帳區/

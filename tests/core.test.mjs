@@ -11,7 +11,7 @@ vm.createContext(ctx);
 for (const rel of ['shared/reference-data.js','shared/config.js','shared/validation.js','shared/planning.js','shared/money.js']) {
   vm.runInContext(fs.readFileSync(path.join(root, rel), 'utf8'), ctx, { filename: rel });
 }
-const api = vm.runInContext('({REFERENCE_DATA,DEFAULT_CONFIG,SCENARIO_FIRE,Validation,Planning,Money})', ctx);
+const api = vm.runInContext('({REFERENCE_DATA,DEFAULT_CONFIG,SCENARIO_FIRE,Validation,Planning,Money,DEFAULT_LEDGER,DEFAULT_SCENARIOS})', ctx);
 
 test('官方通膨快照包含來源與日期', () => {
   assert.ok(api.REFERENCE_DATA.twInflation.sourceUrl.startsWith('https://'));
@@ -55,6 +55,37 @@ test('緊急預備金不重複當作目標本金', () => {
   const r = api.Planning.assess(p, new Date('2026-08-07T00:00:00Z'));
   assert.equal(r.goalStartingAssets, 0);
   assert.equal(r.monthlyGoalContribution, 1000);
+});
+
+test("指定預備金帳戶與總流動資產採分離口徑", () => {
+  const p = structuredClone(api.DEFAULT_CONFIG.quickPlan);
+  p.emergencyTargetMonths = 6;
+  p.monthlyEssentialExpenseCents = 1000;
+  p.liquidAssetsCents = 100000;
+  p.emergencyReserveCents = 0;
+  const r = api.Planning.assess(p, new Date("2026-08-07T00:00:00Z"));
+  assert.equal(r.emergencyMonths, 0);
+  assert.equal(r.emergencyGap, 6000);
+  assert.equal(r.goalStartingAssets, 94000);
+});
+
+test("自訂緊急預備金月數會影響目標與風險", () => {
+  const p = structuredClone(api.DEFAULT_CONFIG.quickPlan);
+  p.emergencyTargetMonths = 12;
+  p.monthlyEssentialExpenseCents = 1000;
+  p.liquidAssetsCents = 6000;
+  const r = api.Planning.assess(p, new Date("2026-08-07T00:00:00Z"));
+  assert.equal(r.emergencyTarget, 12000);
+  assert.equal(r.emergencyGap, 6000);
+  assert.ok(r.risks.some(x => x.code === "EMERGENCY_BELOW_TARGET"));
+});
+
+test("工作區拒絕不存在的首頁帳戶", () => {
+  const workspace = { config: structuredClone(api.DEFAULT_CONFIG), ledger: structuredClone(api.DEFAULT_LEDGER), scenarios: structuredClone(api.DEFAULT_SCENARIOS) };
+  workspace.config.dashboard.emergencyAccountId = "missing-account";
+  const r = api.Validation.validateWorkspace(workspace);
+  assert.equal(r.valid, false);
+  assert.ok(r.errors.some(e => e.code === "MISSING_ACCOUNT"));
 });
 
 test('無效快速設定被拒絕，不產生 Infinity', () => {
@@ -226,11 +257,95 @@ test('FIRE拒絕零除與錯誤年齡順序', () => {
   assert.throws(() => api.Money.calcScenario(s, c), /年齡/);
 });
 
-test('FIRE零報酬率以固定年限支出計算，不回傳 Infinity', () => {
+test("FIRE 拒絕負數財務欄位與超過 100% 分配", () => {
+  const c = structuredClone(api.DEFAULT_CONFIG);
+  const s = structuredClone(api.SCENARIO_FIRE);
+  s.retirementMonthlyExpenseCents = -1;
+  s.allocationPercents["投資提撥（FIRE 基金）"] = 1.1;
+  assert.throws(() => api.Money.calcScenario(s, c), /非負有限金額|100%/);
+});
+
+test('FIRE零報酬率在永續模型中被拒絕，有限模型可計算', () => {
   const c = structuredClone(api.DEFAULT_CONFIG);
   const s = structuredClone(api.SCENARIO_FIRE);
   s.postRetirementAnnualReturnRate = 0;
+  s.retirementInflationAnnualRate = 0;
+  assert.throws(() => api.Money.calcScenario(s, c), /永續模型要求/);
+  s.retirementFundingModel = 'finite';
   const r = api.Money.calcScenario(s, c);
   assert.ok(Number.isFinite(r.retirementAssetTarget));
   assert.equal(r.retirementAssetTarget, s.retirementMonthlyExpenseCents * 12 * (s.deathAge - s.retireAge));
+});
+test("自訂情境以折扣類型扣除成本", () => {
+  const c = structuredClone(api.DEFAULT_CONFIG);
+  const s = { schemaVersion: 2, scenarioId: "custom-discount", calcType: "items", currency: "TWD", rateToTWD: 1, applyInflation: false, items: [
+    { label: "裝修", kind: "cost", amountCents: 100000 },
+    { label: "補助", kind: "discount", amountCents: 20000 }
+  ] };
+  const r = api.Money.calcScenario(s, c);
+  assert.equal(r.total, 80000);
+  assert.equal(api.Validation.validateScenario(s).valid, true);
+});
+test("舊格式減免會正規化為折扣並保留期別類型", () => {
+  const c = structuredClone(api.DEFAULT_CONFIG);
+  const s = { schemaVersion: 1, scenarioId: "legacy-period", calcType: "periods", itemTemplate: [
+    { label: "學費", amountCents: 100000 },
+    { label: "減免", amountCents: -20000 }
+  ], periods: [{ label: "第一期", overrides: { "學費": 100000, "減免": -20000 } }] };
+  const normalized = api.Validation.normalizeScenario(s);
+  assert.equal(normalized.itemTemplate[1].kind, "discount");
+  assert.equal(normalized.itemTemplate[1].amountCents, 20000);
+  const result = api.Money.calcScenario(normalized, c);
+  assert.equal(result.periods[0].items[1].kind, "discount");
+  assert.equal(result.periods[0].total, 80000);
+});
+
+test("折扣超過成本時總額不會變成負數", () => {
+  assert.equal(api.Money.sumItems([
+    { label: "成本", kind: "cost", amountCents: 1000 },
+    { label: "減免", kind: "discount", amountCents: 1500 }
+  ]), 0);
+});
+test("情境摘要統一提供首頁所需的總額與缺口", () => {
+  const c = structuredClone(api.DEFAULT_CONFIG);
+  const s = { schemaVersion: 2, scenarioId: "summary-items", calcType: "items", applyInflation: false, currentSavedCents: 20000, items: [
+    { label: "成本", kind: "cost", amountCents: 100000 }
+  ] };
+  const result = api.Money.calcScenario(s, c);
+  const summary = api.Money.toScenarioSummary(s, result);
+  assert.equal(summary.type, "items");
+  assert.equal(summary.totalCents, 100000);
+  assert.equal(summary.targetCents, 80000);
+  assert.equal(summary.gapCents, 80000);
+  assert.equal(summary.status, "planned");
+});
+
+test("情境類型可從舊格式期別資料正確推導", () => {
+  assert.equal(api.Money.getScenarioType({ periods: [] }), "periods");
+  assert.equal(api.Money.getScenarioType({ calcType: "fire", periods: [] }), "fire");
+});
+test("情境摘要保留已超額資金，不把錯誤混同為零", () => {
+  const c = structuredClone(api.DEFAULT_CONFIG);
+  const s = { schemaVersion: 2, scenarioId: "surplus-items", calcType: "items", applyInflation: false, currentSavedCents: 120000, items: [
+    { label: "成本", kind: "cost", amountCents: 100000 }
+  ] };
+  const summary = api.Money.toScenarioSummary(s, api.Money.calcScenario(s, c));
+  assert.equal(summary.rawGapCents, -20000);
+  assert.equal(summary.gapCents, 0);
+  assert.equal(summary.surplusCents, 20000);
+  assert.equal(summary.status, "funded");
+});
+
+test("工作區拒絕不同 ID 的重複自動固定支出來源", () => {
+  const config = structuredClone(api.DEFAULT_CONFIG);
+  const ledger = structuredClone(api.DEFAULT_LEDGER);
+  const scenarios = structuredClone(api.DEFAULT_SCENARIOS);
+  const accountId = config.accountProfiles[0].id;
+  config.recurringCashFlows = [
+    { id: "system-student-loan-repayment", type: "expense", kind: "fixed_expense", amountCents: 1, dayOfMonth: 1, accountId, source: "scenario:student_loan" },
+    { id: "legacy-student-loan-copy", type: "expense", kind: "fixed_expense", amountCents: 1, dayOfMonth: 1, accountId, source: "scenario:student_loan" }
+  ];
+  const result = api.Validation.validateWorkspace({ config, ledger, scenarios });
+  assert.equal(result.valid, false);
+  assert.ok(result.errors.some(e => e.code === "DUPLICATE_SOURCE"));
 });

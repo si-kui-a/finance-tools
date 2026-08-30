@@ -2,6 +2,9 @@ name: 阻擋真實資料誤入公開倉庫
 
 on: [push, pull_request]
 
+permissions:
+  contents: read
+
 jobs:
   scan:
     runs-on: ubuntu-latest
@@ -11,5 +14,22 @@ jobs:
       - name: 掃描疑似真實資料檔案
         run: bash scripts/check-no-real-data.sh
 
-      - name: 執行計算與驗證測試
-        run: node --test
+      - name: 設定 Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: 執行完整檢查並保存日誌
+        shell: bash
+        run: |
+          set -o pipefail
+          npm run check 2>&1 | tee ci-check.log
+
+      - name: 上傳 CI 檢查日誌
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: finance-ci-logs-${{ github.run_id }}
+          path: ci-check.log
+          if-no-files-found: warn
+          retention-days: 14
