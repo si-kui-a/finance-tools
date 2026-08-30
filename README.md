@@ -218,3 +218,21 @@ npm run check
 測試涵蓋通膨、實質報酬、財務健檢、壓力情境、帳本驗證、外幣匯率、FIRE、目標推算及多項邊界條件。GitHub Actions 會同步執行程式檢查、測試與隱私掃描。
 
 每次 GitHub Actions 執行都會跑 `npm run check`，並將完整輸出保存為 `finance-ci-logs-<run_id>` artifact（保留 14 天）。若檢查失敗，請先下載該 artifact，再依日誌中的語法錯誤、測試名稱與堆疊位置進行修正。
+
+## 機械複查（2026-08-30訂定，移植自wordpress-builder-playbook repo的同類規則）
+
+本專案是純前端靜態工具，沒有PAT編號式知識庫，不確定的做法先查本節
+上方「計算方式與重要界線」，內部真的沒有才查外部。**機械複查**：
+`node scripts/dev-knowledge-audit.mjs`——`shared/`底下JS檔案篇幅離群值
+/README過時關鍵字候選，純Node內建模組，只找候選不判斷對錯，不進CI，
+手動觸發即可。
+
+**★閥值自動觸發★**收工時先跑這行判斷要不要做健檢，不用自己記或等
+使用者提醒：
+```bash
+git rev-list --count $(head -c 7 scripts/.last-audit-marker)..HEAD
+```
+（**這個檔案不存在**時上面這行會直接報錯——代表從沒跑過健檢，視同
+數字已達閥值，直接跑健檢腳本並用結果建立這個檔案，不用回頭修這行
+指令）**這個數字≥8就自動跑**`node scripts/dev-knowledge-audit.mjs`，
+跑完後用當下HEAD的short SHA+日期覆寫`scripts/.last-audit-marker`。
