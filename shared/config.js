@@ -24,7 +24,7 @@ const DEFAULT_CONFIG = {
     scenarioTargetMonths: {},
     summaryCards: [
       { id: 'income', source: 'income', label: '月收入', visible: true, builtIn: true },
-      { id: 'fixed-expense', source: 'fixedExpense', label: '固定應繳', visible: true, builtIn: true },
+      { id: 'fixed-expense', source: 'fixedExpense', label: '固定支出', visible: true, builtIn: true },
       { id: 'recommended-saving', source: 'recommendedSaving', label: '應儲蓄', visible: true, builtIn: true },
       { id: 'daily-living', source: 'dailyLiving', label: '每日生活費', visible: true, builtIn: true },
       { id: 'monthly-flex', source: 'monthlyFlex', label: '月度餘裕', visible: true, builtIn: true }
@@ -56,6 +56,7 @@ const DEFAULT_CONFIG = {
     monthlyOtherExpenseCents: 700000,
     liquidAssetsCents: 5000000,
     goalScenarioId: 'manual',
+    emergencyTargetMonths: 6,
     goalAmountTodayCents: 30000000,
     goalDeadlineMode: 'month',
     goalTargetMonth: '2028-12',
@@ -171,7 +172,7 @@ const SCENARIO_STUDENT_LOAN = {
   itemTemplate: [
     { label: '學費', amountCents: 4012500 },
     { label: '雜費', amountCents: 809200 },
-    { label: '減免', amountCents: -1750000 },
+    { label: '減免', kind: 'discount', amountCents: 1750000 },
     { label: '電腦網路通訊費', amountCents: 125000 },
     { label: '平安保險費', amountCents: 23500 }
   ],
@@ -248,6 +249,8 @@ const SCENARIO_FIRE = {
   currentMonthlyExpenseCents: 2500000,
   retirementMonthlyExpenseCents: 5000000,
   postRetirementAnnualReturnRate: 0.05,
+  retirementFundingModel: 'perpetuity',
+  retirementInflationAnnualRate: REFERENCE_DATA.twInflation.annualRate,
   buyHouseGoalCents: 3000000000,
   studyAbroadFundCents: 300000000,
   emergencyFundMonths: 12,

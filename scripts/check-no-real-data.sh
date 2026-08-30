@@ -7,6 +7,8 @@ check_file() {
   rel="${f#./}"
   base="$(basename "$rel")"
   [[ -f "$f" ]] || return 0
+  # 被 .gitignore 排除的個人工作區不屬於提交內容；staged 檔案仍會被檢查。
+  if git check-ignore -q -- "$f" 2>/dev/null; then return 0; fi
   if [[ "$rel" == sample-data/* && "$base" == *.sample.json ]]; then return 0; fi
   if [[ "$base" =~ ^(ledger|config|estimator_.*|wage_reverse_.*|loan_.*)(_[0-9-]+)?\.(json|csv)$ ]]; then
     echo "❌ 疑似真實財務資料檔案：$rel"; blocked=1
