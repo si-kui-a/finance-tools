@@ -276,6 +276,19 @@ test('FIRE零報酬率在永續模型中被拒絕，有限模型可計算', () =
   assert.ok(Number.isFinite(r.retirementAssetTarget));
   assert.equal(r.retirementAssetTarget, s.retirementMonthlyExpenseCents * 12 * (s.deathAge - s.retireAge));
 });
+
+test('省略退休後通膨率（等同於0）在永續模型中仍須被拒絕，不能只在明確填0才檔', () => {
+  // 2026-09-11全倉庫稽核發現：validation.js原本只在retirementInflationAnnualRate
+  // 「有明確填值」時才做永續可行性檢查，但money.js一律用 ?? 0 補完再計算——
+  // 單純省略此欄位（前端表單未觸碰過的預設狀態）就會繞過這條防呆，得到一個
+  // 數學上不可能永續、卻沒有任何錯誤訊息的結果。
+  const c = structuredClone(api.DEFAULT_CONFIG);
+  const s = structuredClone(api.SCENARIO_FIRE);
+  s.postRetirementAnnualReturnRate = 0;
+  delete s.retirementInflationAnnualRate;
+  assert.equal(api.Validation.validateScenario(s).valid, false);
+  assert.throws(() => api.Money.calcScenario(s, c), /永續模型要求/);
+});
 test("自訂情境以折扣類型扣除成本", () => {
   const c = structuredClone(api.DEFAULT_CONFIG);
   const s = { schemaVersion: 2, scenarioId: "custom-discount", calcType: "items", currency: "TWD", rateToTWD: 1, applyInflation: false, items: [

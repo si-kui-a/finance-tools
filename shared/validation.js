@@ -112,7 +112,13 @@ const Validation = (() => {
       if (!finite(s.postRetirementAnnualReturnRate) || s.postRetirementAnnualReturnRate < 0 || s.postRetirementAnnualReturnRate > 0.20) errors.push(error(`${path}.postRetirementAnnualReturnRate`, 'INVALID_RATE', '退休後年化報酬率須介於 0%–20%'));
       if (!['perpetuity', 'finite'].includes(s.retirementFundingModel || 'perpetuity')) errors.push(error(path + '.retirementFundingModel', 'INVALID_MODEL', 'Invalid retirement funding model'));
       if (s.retirementInflationAnnualRate !== undefined && (!finite(s.retirementInflationAnnualRate) || s.retirementInflationAnnualRate < 0 || s.retirementInflationAnnualRate > 0.20)) errors.push(error(path + '.retirementInflationAnnualRate', 'INVALID_RATE', '退休後通膨率須介於 0%–20%'));
-      if ((s.retirementFundingModel || 'perpetuity') === 'perpetuity' && s.retirementInflationAnnualRate !== undefined && s.postRetirementAnnualReturnRate <= s.retirementInflationAnnualRate) errors.push(error(path + '.retirementInflationAnnualRate', 'UNSUSTAINABLE_WITHDRAWAL', '永續模型要求退休後報酬率高於退休後通膨率'));
+      // money.js 的 calcFireScenario 一律用 `?? 0` 補上未填的通膨率再計算，
+      // 這裡的永續模型可行性檢查也必須用同一個補完後的值比對，不能只在
+      // 使用者「有明確填」時才檢查——否則單純省略此欄位（等同於填0）就會
+      // 繞過這條防呆，money.js 那邊仍然照樣用0去算，算出一個看似合法但
+      // 數學上不可能永續的財務獨立目標金額（2026-09-11全倉庫稽核發現）。
+      const effectiveRetirementInflationRate = s.retirementInflationAnnualRate ?? 0;
+      if ((s.retirementFundingModel || 'perpetuity') === 'perpetuity' && s.postRetirementAnnualReturnRate <= effectiveRetirementInflationRate) errors.push(error(path + '.retirementInflationAnnualRate', 'UNSUSTAINABLE_WITHDRAWAL', '永續模型要求退休後報酬率高於退休後通膨率'));
       const fireMoneyFields = ["currentMonthlySalaryCents", "currentMonthlyExpenseCents", "retirementMonthlyExpenseCents", "totalSavedCents", "buyHouseGoalCents", "studyAbroadFundCents", "insuredSalaryCents"];
       fireMoneyFields.forEach((key) => { if (!finite(s[key]) || s[key] < 0) errors.push(error(`${path}.${key}`, "INVALID_MONEY", `${key} 必須是非負有限金額`)); });
       if (!finite(s.emergencyFundMonths) || s.emergencyFundMonths < 0 || s.emergencyFundMonths > 120) errors.push(error(`${path}.emergencyFundMonths`, "INVALID_TERM", "FIRE 緊急預備金月數須介於 0–120 個月"));
